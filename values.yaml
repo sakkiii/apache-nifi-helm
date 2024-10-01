@@ -1,0 +1,273 @@
+# Default values for nifi.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+global:
+  busybox:
+    repository: busybox:stable
+
+  nifi:
+    nodeCount: 3
+
+  serviceAccount:
+    # Name of the existing service account to use. If not defined, one is created.
+    name: ""
+    # Annotations to add to the service account
+    annotations: { }
+
+  encryption:
+    sensitivePropertiesKey:
+      secretRef:
+        name: ""
+        key: ""
+
+  tls:
+    certificate:
+      duration: 8760h # 365 days
+      renewBefore: 168h # 7 days
+      keystorePasswordSecretRef:
+        name: ""
+        key: password
+
+  oidc:
+    oidc_url: ""
+    client_id: ""
+    client_secret: ""
+    claim_identifying_user: "preferred_username"
+    initial_admin_identity: ""
+
+image:
+  repository: apache/nifi
+  pullPolicy: IfNotPresent
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: ""
+
+# Set to `true` to pause at startup before loading the application
+debugStartup: false
+
+# Number of seconds to wait for tasks to complete on shutdown, before forcefully terminating them
+shutdown:
+  gracefulShutdownSeconds: 20 # Consider whether there are any long-running processors defined in the flow
+  podTerminationGracePeriodSeconds: 30 # Should be longer than `gracefulShutdownSeconds`
+
+ui:
+  refreshInterval: 10 sec
+  timeZone: "" # IANA timezone identifier. Time is displayed using this timezone in the UI.
+  maxThreads: "" # Maximum number of Jetty threads to use for UI and HTTP site-to-site connections
+
+tls:
+  # Additional subject alternative names included in the certificate issued to cluster nodes
+  subjectAltNames: [ ]
+#    - nifi.internal
+
+encryption:
+  # Used to encrypt all repositories
+  repository:
+    enabled: false
+    keyId: 1
+    secretRef:
+      name: ""
+      key: repository.p12 # File extension must be either .p12 or .bcfks
+
+logging:
+  # Override log verbosity settings in conf/logback.xml
+  levels: { }
+#    org.apache.nifi.web.security: DEBUG
+
+persistence:
+  takeOwnershipOnStartup: true
+  config:
+    files:
+      authorizations: authorizations.xml
+      users: users.xml
+      flowJson: flow.json.gz
+    volumeMount:
+      name: data # Name of the volume mount to use
+      subPath: conf # Volume mount subPath
+  state:
+    volumeMount:
+      name: data
+      subPath: state
+  logs:
+    volumeMount:
+      # Specify a custom mount to persist log data in a separate volume (recommended)
+      name: ""
+      subPath: ""
+  repo:
+    # By default, repositories are mapped to a single PVC.
+    # If multiple PVCs are desired (for instance, having separate content and provenance repos), override the relevant section.
+    flowfile:
+      mountDir: flowfile_repository # Relative directory within the container (i.e. /opt/nifi/nifi-current/flowfile_repository)
+      volumeName: data # Name of the volume to mount
+      subPath: flowfile # Subpath within the mounted volume
+    content:
+      - name: default
+        mountDir: content_repository
+        volumeName: data
+        subPath: content
+    provenance:
+      - name: default
+        mountDir: provenance_repository
+        volumeName: data
+        subPath: provenance
+
+ports:
+  https: 8443
+  cluster: 11443
+  remoteinput: 10443
+  loadbalance: 6342
+  metrics: 9092
+
+service:
+  external:
+    annotations: { }
+    type: LoadBalancer # NodePort | LoadBalancer
+    externalTrafficPolicy: Cluster # Cluster | Local
+
+zookeeper:
+  ## If true, install the Zookeeper chart
+  ## ref: https://github.com/bitnami/charts/blob/master/bitnami/zookeeper/values.yaml
+  enabled: true
+  ## If the Zookeeper Chart is disabled a URL and port are required to connect
+  url: ""
+  port: 2181
+  rootNode: "/data"
+  replicaCount: 3
+  traffic:
+    maxThreads: 100 # Max number of threads used for inter-node communication
+
+metrics:
+  # Expose metrics for each node via Ingress
+  ingress:
+    enabled: false
+    https: false
+    basePath: /metrics # Metrics are available externally via Ingress for each pod at: /metrics/<pod name>
+    requireClientCertificate: false
+
+  # Create a ServiceMonitor to enable Prometheus to scrape metrics from each pod
+  serviceMonitor:
+    enabled: false
+    interval: 10s
+
+# Optionally deploy a filebeat sidecar to ship NiFi logs to a receiver
+filebeat:
+  enabled: false
+  image:
+    repository: docker.elastic.co/beats/filebeat
+    tag: ""
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+  securityContext: { }
+  volumeMounts: [ ]
+  #    - mountPath: /opt/secrets
+  #      name: secret
+  tags:
+    - nifi
+  labels: { }
+#    instance: production
+  processors: [ ]
+#    - drop_event:
+#        when:
+#          regexp:
+#            message: "drop_event.*"
+  queue:
+    flushTimeout: 5s
+  output:
+    type: "" # kafka
+    parameters: { }
+#      hosts: ["kafka-1:9092"]
+#      topic: nifi
+
+# Additional ports and Ingress rules to configure for each node
+extraPorts: { }
+#  datafeed:
+#    containerPort: 9443
+#    protocol: TCP
+#    nodePort: 30443 # Set if NodePort is required
+#    loadBalancerPort: 9443
+#    ingress: # Omit if ingress is not required
+#      path: /datafeed
+#      pathType: Exact
+
+# Extra config properties to set at runtime
+extraConfig:
+  nifiProperties: { }
+  # nifi.cluster.node.connection.timeout: 5 secs
+
+extraEnv: [ ]
+#  - name: MY_VAR
+#    value: "some value"
+
+extraVolumes: [ ]
+#  - name: my-volume
+#    nfs:
+#      server: fs.example.com
+#      path: /my-volume
+
+extraVolumeMounts: [ ]
+#  - mountPath: /data/vol-1
+#    name: my-volume
+
+# Additional directories to take ownership of (chown) during startup. Useful where `extraVolumeMounts` are provided.
+# Chown is applied to the specified directory only (shallow), not recursively.
+extraTakeOwnershipPaths: [ ]
+#  - /data/vol-1
+
+ingress:
+  enabled: true
+  ingressClassName: alb
+  hostName: example.com # nifi.example.com
+  siteToSite:
+    subDomain: s2s # Subdomain for site-to-site traffic (e.g. s2s.example.com)
+  annotations: { }
+
+jvmHeap:
+  min: 512m
+  max: 1g
+
+resources:
+  requests:
+    cpu: 500m
+    memory: 2Gi
+
+securityContext:
+  runAsUser: 1000
+  runAsGroup: 1000
+  runAsNonRoot: true
+
+# Set a custom umask for the `nifi` user
+umask: "" # "0002"
+
+volumeClaims:
+  data:
+    storageClassName: "gp3"
+    accessModes:
+      - ReadWriteOnce
+    resources:
+      requests:
+        storage: "10Gi"
+      limits:
+        storage: "20Gi"
+
+probeTimings:
+  startup:
+    initialDelaySeconds: 15
+    timeoutSeconds: 1
+    periodSeconds: 5
+    failureThreshold: 10
+  readiness:
+    initialDelaySeconds: 5
+    timeoutSeconds: 1
+    periodSeconds: 10
+    failureThreshold: 3
+  liveness:
+    initialDelaySeconds: 30
+    timeoutSeconds: 3
+    periodSeconds: 10
+    failureThreshold: 3
+
+nodeSelector: { }
+tolerations: [ ]
+affinity: { }

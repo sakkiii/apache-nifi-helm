@@ -1,0 +1,38 @@
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: {{ include "nifi.fullname" . }}
+  labels:
+    {{- include "nifi.labels" . | nindent 4 }}
+spec:
+  selfSigned: {}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ include "nifi.fullname" . }}
+  labels:
+    {{- include "nifi.labels" . | nindent 4 }}
+spec:
+  secretName: {{ include "nifi.fullname" . }}-tls
+  commonName: {{ include "nifi.fullname" . }}.{{ .Release.Namespace }}
+  dnsNames:
+    - {{ .Values.ingress.hostName }}
+    - {{ include "nifi.siteToSiteHostName" . }}
+    {{- include "nifi.hostNodeList" . | nindent 4 }}
+    {{- include "nifi.ingressNodeList" . | nindent 4 }}
+  usages:
+    - server auth
+    - client auth
+  {{- with .Values.global.tls.certificate }}
+  duration: {{ .duration }}
+  renewBefore: {{ .renewBefore }}
+  keystores:
+    pkcs12:
+      create: true
+      passwordSecretRef:
+        {{- toYaml .keystorePasswordSecretRef | nindent 8 }}
+  {{- end }}
+  issuerRef:
+    name: {{ include "nifi.fullname" . }}
+    kind: Issuer

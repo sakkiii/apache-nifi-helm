@@ -1,0 +1,402 @@
+{{- $nifiHome := "/opt/nifi/nifi-current" }}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "nifi.fullname" . }}
+  labels:
+    {{- include "nifi.labels" . | nindent 4 }}
+spec:
+  podManagementPolicy: Parallel
+  replicas: {{ .Values.global.nifi.nodeCount }}
+  selector:
+    matchLabels:
+      {{- include "nifi.selectorLabels" . | nindent 6 }}
+  serviceName: {{ include "nifi.fullname" . }}
+  template:
+    metadata:
+      labels:
+        {{- include "nifi.selectorLabels" . | nindent 8 }}
+    spec:
+      terminationGracePeriodSeconds: {{ .Values.shutdown.podTerminationGracePeriodSeconds }}
+      {{- if or .Values.persistence.takeOwnershipOnStartup .Values.extraTakeOwnershipPaths }}
+      initContainers:
+        - name: wait-for-zookeeper
+          image: busybox:stable
+          command:
+          - sh
+          - -c
+          - |
+            echo "Connecting to Zookeeper {{ .Release.Name }}-zookeeper"
+            until nc -vzw 1 {{ .Release.Name }}-zookeeper 2181 ; do
+              echo "Waiting for zookeeper to start"
+              sleep 3
+            done
+          resources:
+            requests:
+              cpu: 20m
+              memory: 10Mi
+            limits:
+              cpu: 20m
+              memory: 10Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            privileged: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+        - name: take-ownership
+          image: {{ .Values.global.busybox.repository }}
+          command:
+            - sh
+            - -c
+            - |
+              {{- if .Values.persistence.takeOwnershipOnStartup }}
+              chown {{ .Values.securityContext.runAsUser | int64 }}:{{ .Values.securityContext.runAsGroup | int64 }} data/*
+              {{- end }}
+              {{- range .Values.extraTakeOwnershipPaths }}
+              chown {{ $.Values.securityContext.runAsUser | int64 }}:{{ $.Values.securityContext.runAsGroup | int64 }} {{ . | quote }}
+              {{- end }}
+          securityContext:
+            runAsUser: 0
+            runAsNonRoot: false
+          volumeMounts:
+            {{- with .Values.persistence.config.volumeMount }}
+            - mountPath: /data/persistent_conf
+              name: {{ .name }}
+              {{- if .subPath }}
+              subPath: {{ .subPath }}
+              {{- end }}
+            {{- end }}
+            {{- with .Values.persistence.state.volumeMount }}
+            - mountPath: /data/state
+              name: {{ .name }}
+              {{- if .subPath }}
+              subPath: {{ .subPath }}
+              {{- end }}
+            {{- end }}
+            {{- with .Values.persistence.logs.volumeMount }}
+            - mountPath: /data/logs
+              name: {{ .name | default "logs" }}
+              {{- if .subPath }}
+              subPath: {{ .subPath }}
+              {{- end }}
+            {{- end }}
+            {{- if .Values.persistence.takeOwnershipOnStartup }}
+            {{- with .Values.persistence.repo.flowfile }}
+            - mountPath: {{ printf "/data/%s" .mountDir }}
+              name: {{ .volumeName }}
+              {{- if .subPath }}
+              subPath: {{ .subPath }}
+              {{- end }}
+            {{- end }}
+            {{- range .Values.persistence.repo.content }}
+            - mountPath: {{ printf "/data/%s" .mountDir }}
+              name: {{ .volumeName }}
+              {{- if .subPath }}
+              subPath: {{ .subPath }}
+              {{- end }}
+            {{- end }}
+            {{- range .Values.persistence.repo.provenance }}
+            - mountPath: {{ printf "/data/%s" .mountDir }}
+              name: {{ .volumeName }}
+              {{- if .subPath }}
+              subPath: {{ .subPath }}
+              {{- end }}
+            {{- end }}
+            {{- end }}
+            {{- with .Values.extraVolumeMounts }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+      {{- end }}
+      containers:
+        - name: {{ .Chart.Name }}
+          image: {{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: [ "../scripts/custom-startup.sh" ]
+          env:
+            - name: NIFI_SENSITIVE_PROPS_KEY
+              valueFrom:
+                secretKeyRef:
+                  {{- toYaml .Values.global.encryption.sensitivePropertiesKey.secretRef | nindent 18 }}
+            - name: NIFI_JVM_HEAP_INIT
+              value: {{ .Values.jvmHeap.min | quote }}
+            - name: NIFI_JVM_HEAP_MAX
+              value: {{ .Values.jvmHeap.max | quote }}
+            - name: NIFI_WEB_HTTPS_PORT
+              value: {{ .Values.ports.https | quote }}
+            - name: NIFI_REMOTE_INPUT_SOCKET_PORT
+              value: {{ .Values.ports.remoteinput | quote }}
+            {{- if .Values.zookeeper.enabled }}
+            - name: NIFI_CLUSTER_IS_NODE
+              value: "true"
+            - name: NIFI_ELECTION_MAX_CANDIDATES
+              value: {{ .Values.global.nifi.nodeCount | quote }}
+            - name: NIFI_CLUSTER_NODE_PROTOCOL_MAX_THREADS
+              value: {{ .Values.zookeeper.traffic.maxThreads | quote }}
+            - name: NIFI_ZK_CONNECT_STRING
+              value: "{{ .Release.Name }}-zookeeper:2181"
+            - name: NIFI_ZK_ROOT_NODE
+              value: {{ .Values.zookeeper.rootNode | quote }}
+            - name: NIFI_CLUSTER_NODE_PROTOCOL_PORT
+              value: {{ .Values.ports.cluster | quote }}
+            - name: NIFI_SECURITY_USER_OIDC_DISCOVERY_URL
+              value: {{ .Values.global.oidc.oidc_url }}
+            - name: NIFI_SECURITY_USER_OIDC_CLIENT_ID
+              value: {{ .Values.global.oidc.client_id }}
+            - name: NIFI_SECURITY_USER_OIDC_CLIENT_SECRET
+              value: {{ .Values.global.oidc.client_secret }}
+            - name: NIFI_SECURITY_USER_OIDC_CLAIM_IDENTIFYING_USER
+              value: {{ .Values.global.oidc.claim_identifying_user }}
+            - name: INITIAL_ADMIN_IDENTITY
+              value: {{ .Values.global.oidc.initial_admin_identity }}
+            - name: AUTH
+              value: oidc
+            {{- end }}
+            {{- include "nifi.keystoreEnvironment" . | nindent 12 }}
+            {{- with .Values.extraEnv }}
+            {{ toYaml . | nindent 12 }}
+            {{- end }}
+          ports:
+            {{- range $name, $number := .Values.ports }}
+            - name: {{ $name }}
+              containerPort: {{ $number }}
+              protocol: TCP
+            {{- end }}
+            {{- if .Values.extraPorts }}
+            {{- range $name, $port := .Values.extraPorts }}
+            - name: {{ $name }}
+              containerPort: {{ $port.containerPort }}
+              protocol: {{ $port.protocol | default "TCP" }}
+            {{- end }}
+            {{- end }}
+          volumeMounts:
+            - mountPath: {{ include "nifi.certPath" . }}
+              name: certs
+              readOnly: true
+            - mountPath: {{ include "nifi.tlsPath" . }}
+              name: tls
+            {{- if .Values.encryption.repository.enabled }}
+            - mountPath: {{ $nifiHome }}/conf/{{ .Values.encryption.repository.secretRef.key }}
+              name: secrets
+              subPath: {{ .Values.encryption.repository.secretRef.key }}
+              readOnly: true
+            {{- end }}
+            - mountPath: /opt/nifi/scripts/custom-startup.sh
+              name: config
+              subPath: custom-startup.sh
+              readOnly: true
+            {{- with .Values.persistence.config.volumeMount }}
+            - mountPath: {{ $nifiHome }}/persistent_conf
+              name: {{ .name }}
+              {{- if .subPath }}
+              subPath: {{ .subPath }}
+              {{- end }}
+            {{- end }}
+            {{- with .Values.persistence.state.volumeMount }}
+            - mountPath: {{ $nifiHome }}/state
+              name: {{ .name }}
+              {{- if .subPath }}
+              subPath: {{ .subPath }}
+              {{- end }}
+            {{- end }}
+            - mountPath: {{ $nifiHome }}/logs
+              {{- with .Values.persistence.logs.volumeMount }}
+              name: {{ .name | default "logs" }}
+              {{- if .subPath }}
+              subPath: {{ .subPath }}
+              {{- end }}
+              {{- end }}
+            {{- with .Values.persistence.repo.flowfile }}
+            - mountPath: {{ printf "%s/%s" $nifiHome .mountDir }}
+              name: {{ .volumeName }}
+              {{- if .subPath }}
+              subPath: {{ .subPath }}
+              {{- end }}
+            {{- end }}
+            {{- range .Values.persistence.repo.content }}
+            - mountPath: {{ printf "%s/%s" $nifiHome .mountDir }}
+              name: {{ .volumeName }}
+              {{- if .subPath }}
+              subPath: {{ .subPath }}
+              {{- end }}
+            {{- end }}
+            {{- range .Values.persistence.repo.provenance }}
+            - mountPath: {{ printf "%s/%s" $nifiHome .mountDir }}
+              name: {{ .volumeName }}
+              {{- if .subPath }}
+              subPath: {{ .subPath }}
+              {{- end }}
+            {{- end }}
+            {{- with .Values.extraVolumeMounts }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          {{- if not .Values.debugStartup }}
+          startupProbe:
+            httpGet:
+              path: /nifi
+              port: https
+              scheme: HTTPS
+            {{- toYaml .Values.probeTimings.startup | nindent 12 }}
+          readinessProbe:
+            httpGet:
+              path: /nifi
+              port: https
+              scheme: HTTPS
+            {{- toYaml .Values.probeTimings.readiness | nindent 12 }}
+          livenessProbe:
+            httpGet:
+              path: /nifi
+              port: https
+              scheme: HTTPS
+            {{- toYaml .Values.probeTimings.liveness | nindent 12 }}
+          {{- end }}
+        {{- if .Values.filebeat.enabled }}
+        - name: filebeat
+          image: {{ .Values.filebeat.image.repository }}:{{ .Values.filebeat.image.tag | default "latest" }}
+          args:
+            - -e
+            - -E
+            - http.enabled=true
+          volumeMounts:
+            - mountPath: /usr/share/filebeat/filebeat.yml
+              subPath: filebeat.yml
+              name: filebeat-config
+              readOnly: true
+            - mountPath: /nifi/logs
+              {{- with .Values.persistence.logs.volumeMount }}
+              name: {{ .name | default "logs" }}
+              {{- if .subPath }}
+              subPath: {{ .subPath }}
+              {{- end }}
+              {{- end }}
+          {{- with .Values.filebeat.volumeMounts }}
+          {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.filebeat.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          startupProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - |
+                  #!/usr/bin/env bash -e
+                  filebeat test input
+            {{- toYaml .Values.probeTimings.startup | nindent 12 }}
+          readinessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - |
+                  #!/usr/bin/env bash -e
+                  filebeat test output
+            {{- toYaml .Values.probeTimings.readiness | nindent 12 }}
+          livenessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - |
+                  #!/usr/bin/env bash -e
+                  curl --fail 127.0.0.1:5066
+            {{- toYaml .Values.probeTimings.liveness | nindent 12 }}
+        {{- end }}
+      volumes:
+        - name: certs
+          secret:
+            secretName: {{ include "nifi.fullname" . }}-tls     # The secret created by cert-manager
+            optional: false                                     # Secret must be present
+        - name: tls
+          emptyDir: { }
+        - name: config
+          configMap:
+            name: {{ include "nifi.fullname" . }}
+            items:
+              - key: custom-startup.sh
+                path: custom-startup.sh
+                mode: 0744
+        {{- with .Values.persistence.logs.volumeMount }}
+        {{- /* Use an emptyDir volume if no persistence is configured */}}
+        {{- if not .name }}
+        - name: logs
+          emptyDir: { }
+        {{- end }}
+        {{- end }}
+        {{- with .Values.extraVolumes }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        {{- if .Values.encryption.repository.enabled }}
+        {{- with .Values.encryption.repository.secretRef }}
+        - name: secrets
+          secret:
+            secretName: {{ .name }}
+            defaultMode: 0400
+        {{- end }}
+        {{- end }}
+        {{- with .Values.filebeat }}
+        {{- if .enabled }}
+        - name: filebeat-config
+          configMap:
+            name: {{ include "nifi.fullname" $ }}-filebeat
+        {{- end }}
+        {{- end }}
+      {{- with .Values.global.serviceAccount }}
+      serviceAccountName: {{ .name | default (include "nifi.fullname" $) }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.securityContext | nindent 8 }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      affinity:
+        {{- if .Values.affinity }}
+        {{- toYaml . | nindent 8 }}
+        {{- else }}
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    {{- include "nifi.selectorLabels" . | nindent 20 }}
+                topologyKey: kubernetes.io/hostname
+              weight: 100
+        {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+  {{- with .Values.volumeClaims }}
+  volumeClaimTemplates:
+    {{- range $name, $volumeClaim := . }}
+    - metadata:
+        name: {{ $name }}
+      spec:
+        {{- toYaml $volumeClaim | nindent 8 }}
+    {{- end }}
+  {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "nifi.fullname" . }}
+  labels:
+    {{- include "nifi.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  clusterIP: None
+  publishNotReadyAddresses: true
+  ports:
+    {{- range $name, $number := .Values.ports }}
+    - name: {{ $name }}
+      port: {{ $number }}
+      protocol: TCP
+    {{- end }}
+  selector:
+    {{- include "nifi.selectorLabels" . | nindent 4 }}
