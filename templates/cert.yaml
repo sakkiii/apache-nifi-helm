@@ -19,6 +19,7 @@ spec:
   dnsNames:
     - {{ .Values.ingress.hostName }}
     - {{ include "nifi.siteToSiteHostName" . }}
+    - {{ include "nifi.fullname" . }}-http.{{ .Release.Namespace }}
     {{- include "nifi.hostNodeList" . | nindent 4 }}
     {{- include "nifi.ingressNodeList" . | nindent 4 }}
   usages:

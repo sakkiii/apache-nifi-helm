@@ -113,7 +113,11 @@ spec:
         - name: {{ .Chart.Name }}
           image: {{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
-          command: [ "../scripts/custom-startup.sh" ]
+          command: [ "../scripts/k8s/custom-startup.sh" ]
+          lifecycle:
+            preStop:
+              exec:
+                command: [ "../scripts/k8s/pre-stop.sh" ]
           env:
             - name: NIFI_SENSITIVE_PROPS_KEY
               valueFrom:
@@ -182,9 +186,8 @@ spec:
               subPath: {{ .Values.encryption.repository.secretRef.key }}
               readOnly: true
             {{- end }}
-            - mountPath: /opt/nifi/scripts/custom-startup.sh
+            - mountPath: /opt/nifi/scripts/k8s
               name: config
-              subPath: custom-startup.sh
               readOnly: true
             {{- with .Values.persistence.config.volumeMount }}
             - mountPath: {{ $nifiHome }}/persistent_conf
@@ -317,10 +320,7 @@ spec:
         - name: config
           configMap:
             name: {{ include "nifi.fullname" . }}
-            items:
-              - key: custom-startup.sh
-                path: custom-startup.sh
-                mode: 0744
+            defaultMode: 0554
         {{- with .Values.persistence.logs.volumeMount }}
         {{- /* Use an emptyDir volume if no persistence is configured */}}
         {{- if not .name }}

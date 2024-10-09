@@ -160,6 +160,43 @@ data:
     {{- end }}
 
     exec $scripts_dir/start.sh
+  pre-stop.sh: |
+    #!/bin/bash
+
+    # NiFi toolkit CLI path
+    NIFI_CLI="/opt/nifi/nifi-toolkit-current/bin/cli.sh"
+    NIFI_URL="https://{{ $serviceHostName }}:8443"
+
+    # Get the hostname
+    HOSTNAME=$(hostname)
+    echo "Retrieving node information for the hostname: $HOSTNAME..."
+
+    # Retrieve the list of nodes
+    NODE_INFO=$($NIFI_CLI nifi get-nodes -u "$NIFI_URL")
+
+    # Extract the node ID based on the hostname
+    NODE_ID=$(echo "$NODE_INFO" | grep "$HOSTNAME" | awk '{print $2}')
+
+    # Check if the NODE_ID is empty
+    if [ -z "$NODE_ID" ]; then
+      echo "Node ID for $HOSTNAME not found. Exiting."
+      exit 1
+    fi
+
+    # Disconnect the current node
+    echo "Offloading node $NODE_ID..."
+    $NIFI_CLI nifi disconnect-node --nifiNodeId "$NODE_ID" -u "$NIFI_URL"
+
+    # Offload the current node
+    echo "Offloading node $NODE_ID..."
+    $NIFI_CLI nifi offload-node --nifiNodeId "$NODE_ID" -u "$NIFI_URL"
+
+    # Remove the node
+    echo "Remove node $NODE_ID..."
+    $NIFI_CLI nifi delete-node --nifiNodeId "$NODE_ID" -u "$NIFI_URL"
+
+    echo "Node $NODE_ID offloaded and removed successfully."
+
 {{- with .Values.filebeat }}
 {{- if .enabled }}
 ---
