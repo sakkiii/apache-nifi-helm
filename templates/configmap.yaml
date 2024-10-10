@@ -178,7 +178,7 @@ data:
     # Function to get the status of the node
     get_node_status() {
       NODE_ID="$1"
-      NODE_STATUS=$($NIFI_CLI nifi get-node --nifiNodeId "$NODE_ID" -u "$NIFI_URL" | awk '/Node Status/ {print $NF}')
+      NODE_STATUS=$($NIFI_CLI nifi get-node --nifiNodeId "$NODE_ID" -u "$NIFI_URL" -ot json | jq -r '.node.status')
       echo "$NODE_STATUS"
     }
 
@@ -263,6 +263,7 @@ data:
     done
 
     # If the node hasn't offloaded after the max attempts, exit with an error
+    CURRENT_STATUS=$(get_node_status "$NODE_ID")
     if [ "$CURRENT_STATUS" != "OFFLOADED" ]; then
       echo "$(date): Node $NODE_ID failed to offload after $MAX_ATTEMPTS attempts. Exiting."
       exit 1
