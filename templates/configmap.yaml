@@ -165,37 +165,114 @@ data:
 
     # NiFi toolkit CLI path
     NIFI_CLI="/opt/nifi/nifi-toolkit-current/bin/cli.sh"
+
+    # NiFi Cluster variables (use a proper hostname substitution here)
     NIFI_URL="https://{{ $serviceHostName }}:8443"
+
+    # Log file path (update to your desired destination)
+    LOG_FILE="/opt/nifi/nifi-current/logs/k8s-pre-stop.log"
+
+    # Redirect all output (stdout and stderr) to the log file
+    exec > >(tee -a "$LOG_FILE") 2>&1
+
+    # Function to get the status of the node
+    get_node_status() {
+      NODE_ID="$1"
+      NODE_STATUS=$($NIFI_CLI nifi get-node --nifiNodeId "$NODE_ID" -u "$NIFI_URL" | awk '/Node Status/ {print $NF}')
+      echo "$NODE_STATUS"
+    }
+
+    # Retry function for critical steps (like disconnecting or offloading nodes)
+    retry_command() {
+      local retries=5
+      local wait_time=5
+      local cmd="$@"
+      
+      for ((i=1; i<=retries; i++)); do
+        eval "$cmd"
+        if [ $? -eq 0 ]; then
+          return 0
+        fi
+        echo "$(date): Command failed. Retrying in $wait_time seconds... (Attempt $i/$retries)"
+        sleep $wait_time
+      done
+      
+      echo "$(date): Command failed after $retries attempts. Exiting."
+      exit 1
+    }
 
     # Get the hostname
     HOSTNAME=$(hostname)
-    echo "Retrieving node information for the hostname: $HOSTNAME..."
+    echo "$(date): Retrieving node information for the hostname: $HOSTNAME..."
 
     # Retrieve the list of nodes
     NODE_INFO=$($NIFI_CLI nifi get-nodes -u "$NIFI_URL")
+
+    # Check if NODE_INFO is empty (failed retrieval)
+    if [ -z "$NODE_INFO" ]; then
+      echo "$(date): Failed to retrieve node information. Exiting."
+      exit 1
+    fi
 
     # Extract the node ID based on the hostname
     NODE_ID=$(echo "$NODE_INFO" | grep "$HOSTNAME" | awk '{print $2}')
 
     # Check if the NODE_ID is empty
     if [ -z "$NODE_ID" ]; then
-      echo "Node ID for $HOSTNAME not found. Exiting."
+      echo "$(date): Node ID for $HOSTNAME not found. Exiting."
       exit 1
     fi
 
-    # Disconnect the current node
-    echo "Offloading node $NODE_ID..."
-    $NIFI_CLI nifi disconnect-node --nifiNodeId "$NODE_ID" -u "$NIFI_URL"
+    echo "$(date): Node ID for $HOSTNAME is $NODE_ID"
 
-    # Offload the current node
-    echo "Offloading node $NODE_ID..."
-    $NIFI_CLI nifi offload-node --nifiNodeId "$NODE_ID" -u "$NIFI_URL"
+    # Get the current node status
+    CURRENT_STATUS=$(get_node_status "$NODE_ID")
+    echo "$(date): Current node status: $CURRENT_STATUS"
+
+    # Disconnect the current node if it is not already disconnected
+    if [ "$CURRENT_STATUS" != "DISCONNECTED" ]; then
+      echo "$(date): Disconnecting node $NODE_ID..."
+      retry_command "$NIFI_CLI nifi disconnect-node --nifiNodeId $NODE_ID"
+      echo "$(date): Node $NODE_ID disconnected."
+    else
+      echo "$(date): Node $NODE_ID is already disconnected."
+    fi
+
+    # Offload the current node if not already offloaded
+    if [ "$CURRENT_STATUS" != "OFFLOADED" ]; then
+      echo "$(date): Offloading node $NODE_ID..."
+      retry_command "$NIFI_CLI nifi offload-node --nifiNodeId $NODE_ID --connectionTimeout 60000 --readTimeout 60000 -u $NIFI_URL"
+      echo "$(date): Node $NODE_ID offloading..."
+    else
+      echo "$(date): Node $NODE_ID is already offloaded."
+    fi
+
+    # Wait for the node to be fully offloaded with a retry limit
+    MAX_ATTEMPTS=12  # Limit the retries to 12 (with 5-second interval = 1 minute total)
+    attempt=1
+    while [ $attempt -le $MAX_ATTEMPTS ]; do
+      CURRENT_STATUS=$(get_node_status "$NODE_ID")
+      if [ "$CURRENT_STATUS" == "OFFLOADED" ]; then
+        echo "$(date): Node $NODE_ID successfully offloaded."
+        break
+      else
+        echo "$(date): Current node status: $CURRENT_STATUS. Retrying in 5 seconds... (Attempt $attempt/$MAX_ATTEMPTS)"
+        attempt=$((attempt+1))
+        sleep 5
+      fi
+    done
+
+    # If the node hasn't offloaded after the max attempts, exit with an error
+    if [ "$CURRENT_STATUS" != "OFFLOADED" ]; then
+      echo "$(date): Node $NODE_ID failed to offload after $MAX_ATTEMPTS attempts. Exiting."
+      exit 1
+    fi
 
     # Remove the node
-    echo "Remove node $NODE_ID..."
-    $NIFI_CLI nifi delete-node --nifiNodeId "$NODE_ID" -u "$NIFI_URL"
+    echo "$(date): Removing node $NODE_ID..."
+    retry_command "$NIFI_CLI nifi delete-node --nifiNodeId $NODE_ID -u $NIFI_URL"
+    echo "$(date): Node $NODE_ID offloaded and removed successfully."
 
-    echo "Node $NODE_ID offloaded and removed successfully."
 
 {{- with .Values.filebeat }}
 {{- if .enabled }}
