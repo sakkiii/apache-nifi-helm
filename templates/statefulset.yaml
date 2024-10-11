@@ -144,20 +144,9 @@ spec:
               value: {{ .Values.zookeeper.rootNode | quote }}
             - name: NIFI_CLUSTER_NODE_PROTOCOL_PORT
               value: {{ .Values.ports.cluster | quote }}
-            - name: NIFI_SECURITY_USER_OIDC_DISCOVERY_URL
-              value: {{ .Values.global.oidc.oidc_url }}
-            - name: NIFI_SECURITY_USER_OIDC_CLIENT_ID
-              value: {{ .Values.global.oidc.client_id }}
-            - name: NIFI_SECURITY_USER_OIDC_CLIENT_SECRET
-              value: {{ .Values.global.oidc.client_secret }}
-            - name: NIFI_SECURITY_USER_OIDC_CLAIM_IDENTIFYING_USER
-              value: {{ .Values.global.oidc.claim_identifying_user }}
-            - name: INITIAL_ADMIN_IDENTITY
-              value: {{ .Values.global.oidc.initial_admin_identity }}
-            - name: AUTH
-              value: oidc
             {{- end }}
             {{- include "nifi.keystoreEnvironment" . | nindent 12 }}
+            {{- include "nifi.oidcEnvironment" . | nindent 12 }}
             {{- with .Values.extraEnv }}
             {{ toYaml . | nindent 12 }}
             {{- end }}

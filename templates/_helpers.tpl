@@ -133,7 +133,27 @@ Common NiFi/Registry keystore environment variables
 {{- end }}
 
 {{/*
-Comon NiFi/Registry LDAP environment variables
+Comon NiFi OIDC environment variables
+*/}}
+{{- define "nifi.oidcEnvironment" -}}
+{{- with .Values.global.oidc -}}
+- name: AUTH
+  value: oidc
+- name: NIFI_SECURITY_USER_OIDC_DISCOVERY_URL
+  value: {{ .oidc_url | quote }}
+- name: NIFI_SECURITY_USER_OIDC_CLIENT_ID
+  value: {{ .client_id | quote }}
+- name: NIFI_SECURITY_USER_OIDC_CLIENT_SECRET
+  value: {{ .client_secret | quote }}
+- name: NIFI_SECURITY_USER_OIDC_CLAIM_IDENTIFYING_USER
+  value: {{ .claim_identifying_user | quote }}
+- name: INITIAL_ADMIN_IDENTITY
+  value: {{ .initial_admin_identity | quote }}
+{{- end }}
+{{- end }}
+
+{{/*
+Comon NiFi LDAP environment variables
 */}}
 {{- define "nifi.ldapEnvironment" -}}
 {{- with .Values.global.ldap -}}
