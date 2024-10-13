@@ -191,6 +191,9 @@ extraPorts: { }
 #      path: /datafeed
 #      pathType: Exact
 
+# Extra nar library directory
+customLibPath: ""
+
 # Extra config properties to set at runtime
 extraConfig:
   nifiProperties: { }

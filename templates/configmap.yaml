@@ -111,6 +111,9 @@ data:
     prop_add 'nifi.provenance.repository.directory.{{ .name }}' {{ printf "./%s" .mountDir | squote }}
     {{- end }}
 
+    {{- /* Define custom nar library path */}}
+    prop_replace 'nifi.nar.library.directory.custom' {{ .Values.customLibPath | squote }}
+
     {{- /* Generate a TLS cert for this node from the CSI-provided certificates and private key */}}
     cert_dir='/opt/certmanager'
     tls_dir='/opt/tls'
