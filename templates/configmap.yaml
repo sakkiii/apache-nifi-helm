@@ -112,7 +112,7 @@ data:
     {{- end }}
 
     {{- /* Define custom nar library path */}}
-    prop_replace 'nifi.nar.library.directory.custom' {{ .Values.customLibPath | squote }}
+    prop_add 'nifi.nar.library.directory.custom' {{ .Values.customLibPath | squote }}
 
     {{- /* Generate a TLS cert for this node from the CSI-provided certificates and private key */}}
     cert_dir='/opt/certmanager'
