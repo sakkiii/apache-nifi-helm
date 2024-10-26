@@ -33,17 +33,15 @@ This Helm chart installs and configures an Apache NiFi cluster on Kubernetes, al
 To install the chart with the release name `my-nifi`:
 
 ```bash
-helm repo add nifi https://<your-helm-repo-url>
-helm install my-nifi nifi/nifi -f values.yaml
+helm repo add apache-nifi-helm https://sakkiii.github.io/apache-nifi-helm
+helm install my-nifi apache-nifi-helm/nifi -f values.yaml
 ```
 
 To upgrade the release:
 
 ```bash
-helm upgrade my-nifi nifi/nifi -f values.yaml
+helm upgrade my-nifi apache-nifi-helm/nifi -f values.yaml
 ```
-
-> **Note:** Replace `<your-helm-repo-url>` with the appropriate repository URL.
 
 ## Configuration
 
