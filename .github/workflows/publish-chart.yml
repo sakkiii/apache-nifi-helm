@@ -19,9 +19,9 @@ jobs:
         uses: actions/checkout@v4  # Updated to the latest compatible version
 
       - name: Set up Helm
-        uses: deliverybot/helm@v3  # An alternative action that supports Node 20
+        uses: azure/setup-helm@v3  # An alternative action that supports Node 20
         with:
-          version: v3.12.0
+          helm-version: '3.12.0'  # Specify the Helm version
 
       - name: Package Helm Chart
         run: |
@@ -31,7 +31,7 @@ jobs:
         run: |
           # Generate an index.yaml using the REPO_URL environment variable
           helm repo index packaged-charts/ --url "${{ env.REPO_URL }}"
-          
+
       - name: Deploy to GitHub Pages
         if: success()
         uses: peaceiris/actions-gh-pages@v3
