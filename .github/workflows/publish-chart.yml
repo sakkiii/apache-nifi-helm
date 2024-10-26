@@ -4,12 +4,11 @@ on:
   push:
     branches:
       - main
-    paths:
-      - "${{ env.CHART_PATH }}/**"  # Trigger on changes in the specified chart path
+    # Remove the reference to ${{ env.CHART_PATH }} here; it doesn't support `env` directly
   workflow_dispatch:
 
 env:
-  CHART_PATH: "chart"  # Default value (you can override in repository settings)
+  CHART_PATH: "chart"  # Default value; can be overridden in repository settings
   REPO_URL: ${{ secrets.REPO_URL }}  # Repository URL stored as a secret for security
 
 jobs:
