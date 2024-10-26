@@ -1,4 +1,3 @@
-```markdown
 # Apache NiFi Helm Chart
 
 This Helm chart deploys Apache NiFi in a Kubernetes cluster, supporting a variety of configurations to meet production requirements for scalability, security, and resilience.
