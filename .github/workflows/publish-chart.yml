@@ -4,11 +4,10 @@ on:
   push:
     branches:
       - main
-    # Remove the reference to ${{ env.CHART_PATH }} here; it doesn't support `env` directly
   workflow_dispatch:
 
 env:
-  CHART_PATH: "chart"  # Default value; can be overridden in repository settings
+  CHART_PATH: .  # Default path, can be overridden in repository settings
   REPO_URL: ${{ secrets.REPO_URL }}  # Repository URL stored as a secret for security
 
 jobs:
@@ -17,12 +16,12 @@ jobs:
 
     steps:
       - name: Check out code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4  # Updated to the latest compatible version
 
       - name: Set up Helm
-        uses: azure/setup-helm@v3
+        uses: deliverybot/helm@v3  # An alternative action that supports Node 20
         with:
-          version: v3.9.0
+          version: v3.12.0
 
       - name: Package Helm Chart
         run: |
