@@ -274,3 +274,7 @@ probeTimings:
 nodeSelector: { }
 tolerations: [ ]
 affinity: { }
+
+pdb:
+  enabled: true       # Set to false if you want to disable PDB
+  minAvailable: 1     # Minimum available pods during disruptions
