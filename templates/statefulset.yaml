@@ -176,50 +176,20 @@ spec:
               readOnly: true
             {{- end }}
             - mountPath: /opt/nifi/scripts/k8s
-              name: config
+              name: config-script
               readOnly: true
-            {{- with .Values.persistence.config.volumeMount }}
-            - mountPath: {{ $nifiHome }}/persistent_conf
-              name: {{ .name }}
-              {{- if .subPath }}
-              subPath: {{ .subPath }}
-              {{- end }}
-            {{- end }}
-            {{- with .Values.persistence.state.volumeMount }}
-            - mountPath: {{ $nifiHome }}/state
-              name: {{ .name }}
-              {{- if .subPath }}
-              subPath: {{ .subPath }}
-              {{- end }}
-            {{- end }}
-            - mountPath: {{ $nifiHome }}/logs
-              {{- with .Values.persistence.logs.volumeMount }}
-              name: {{ .name | default "logs" }}
-              {{- if .subPath }}
-              subPath: {{ .subPath }}
-              {{- end }}
-              {{- end }}
-            {{- with .Values.persistence.repo.flowfile }}
-            - mountPath: {{ printf "%s/%s" $nifiHome .mountDir }}
-              name: {{ .volumeName }}
-              {{- if .subPath }}
-              subPath: {{ .subPath }}
-              {{- end }}
-            {{- end }}
-            {{- range .Values.persistence.repo.content }}
-            - mountPath: {{ printf "%s/%s" $nifiHome .mountDir }}
-              name: {{ .volumeName }}
-              {{- if .subPath }}
-              subPath: {{ .subPath }}
-              {{- end }}
-            {{- end }}
-            {{- range .Values.persistence.repo.provenance }}
-            - mountPath: {{ printf "%s/%s" $nifiHome .mountDir }}
-              name: {{ .volumeName }}
-              {{- if .subPath }}
-              subPath: {{ .subPath }}
-              {{- end }}
-            {{- end }}
+            - name: config
+              mountPath: {{ $nifiHome }}/persistent_conf
+            - name: state
+              mountPath: {{ $nifiHome }}/state
+            - name: logs
+              mountPath: {{ $nifiHome }}/logs
+            - name: flowfile
+              mountPath: {{ $nifiHome }}/flowfile_repo
+            - name: content
+              mountPath: {{ $nifiHome }}/content_repo
+            - name: provenance
+              mountPath: {{ $nifiHome }}/provenance_repo
             {{- with .Values.extraVolumeMounts }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
@@ -306,7 +276,7 @@ spec:
             optional: false                                     # Secret must be present
         - name: tls
           emptyDir: { }
-        - name: config
+        - name: config-script
           configMap:
             name: {{ include "nifi.fullname" . }}
             defaultMode: 0554
@@ -367,7 +337,11 @@ spec:
     - metadata:
         name: {{ $name }}
       spec:
-        {{- toYaml $volumeClaim | nindent 8 }}
+        accessModes: [ "ReadWriteOnce" ]
+        resources:
+          requests:
+            storage: {{ $volumeClaim.size }}
+        storageClassName: {{ $volumeClaim.storageClass }}
     {{- end }}
   {{- end }}
 ---

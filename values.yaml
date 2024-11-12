@@ -82,12 +82,10 @@ persistence:
       users: users.xml
       flowJson: flow.json.gz
     volumeMount:
-      name: data # Name of the volume mount to use
-      subPath: conf # Volume mount subPath
+      name: config # Name of the volume mount to use
   state:
     volumeMount:
-      name: data
-      subPath: state
+      name: state
   logs:
     volumeMount:
       # Specify a custom mount to persist log data in a separate volume (recommended)
@@ -98,18 +96,15 @@ persistence:
     # If multiple PVCs are desired (for instance, having separate content and provenance repos), override the relevant section.
     flowfile:
       mountDir: flowfile_repository # Relative directory within the container (i.e. /opt/nifi/nifi-current/flowfile_repository)
-      volumeName: data # Name of the volume to mount
-      subPath: flowfile # Subpath within the mounted volume
+      volumeName: flowfile # Name of the volume to mount
     content:
       - name: default
         mountDir: content_repository
-        volumeName: data
-        subPath: content
+        volumeName: content
     provenance:
       - name: default
         mountDir: provenance_repository
-        volumeName: data
-        subPath: provenance
+        volumeName: provenance
 
 ports:
   https: 8443
@@ -244,15 +239,24 @@ securityContext:
 umask: "" # "0002"
 
 volumeClaims:
-  data:
-    storageClassName: "gp3"
-    accessModes:
-      - ReadWriteOnce
-    resources:
-      requests:
-        storage: "10Gi"
-      limits:
-        storage: "20Gi"
+  config:
+    storageClass: "gp3"
+    size: "5Gi"
+  state:
+    storageClass: "gp3"
+    size: "10Gi"
+  logs:
+    storageClass: "gp3"
+    size: "2Gi"
+  flowfile:
+    storageClass: "gp3"
+    size: "10Gi"
+  content:
+    storageClass: "gp3"
+    size: "15Gi"
+  provenance:
+    storageClass: "gp3"
+    size: "10Gi"
 
 probeTimings:
   startup:
