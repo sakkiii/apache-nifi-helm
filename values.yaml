@@ -4,7 +4,7 @@
 
 global:
   busybox:
-    repository: busybox:stable
+    repository: public.ecr.aws/docker/library/busybox:stable
 
   nifi:
     nodeCount: 3
@@ -14,12 +14,6 @@ global:
     name: ""
     # Annotations to add to the service account
     annotations: { }
-
-  encryption:
-    sensitivePropertiesKey:
-      secretRef:
-        name: ""
-        key: ""
 
   tls:
     certificate:

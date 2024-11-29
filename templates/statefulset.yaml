@@ -21,7 +21,7 @@ spec:
       {{- if or .Values.persistence.takeOwnershipOnStartup .Values.extraTakeOwnershipPaths }}
       initContainers:
         - name: wait-for-zookeeper
-          image: busybox:stable
+          image: {{ .Values.global.busybox.repository }}
           command:
           - sh
           - -c
@@ -169,12 +169,6 @@ spec:
               readOnly: true
             - mountPath: {{ include "nifi.tlsPath" . }}
               name: tls
-            {{- if .Values.encryption.repository.enabled }}
-            - mountPath: {{ $nifiHome }}/conf/{{ .Values.encryption.repository.secretRef.key }}
-              name: secrets
-              subPath: {{ .Values.encryption.repository.secretRef.key }}
-              readOnly: true
-            {{- end }}
             - mountPath: /opt/nifi/scripts/k8s
               name: config-script
               readOnly: true
@@ -197,22 +191,22 @@ spec:
             {{- toYaml .Values.resources | nindent 12 }}
           {{- if not .Values.debugStartup }}
           startupProbe:
-            httpGet:
-              path: /nifi
+            tcpSocket:
               port: https
-              scheme: HTTPS
             {{- toYaml .Values.probeTimings.startup | nindent 12 }}
           readinessProbe:
-            httpGet:
-              path: /nifi
-              port: https
-              scheme: HTTPS
+            exec:
+              command:
+                - sh
+                - -c
+                - curl -k -s https://${HOSTNAME}.{{ include "nifi.fullname" . }}.{{ .Release.Namespace }}:{{ .Values.ports.https }}/nifi
             {{- toYaml .Values.probeTimings.readiness | nindent 12 }}
           livenessProbe:
-            httpGet:
-              path: /nifi
-              port: https
-              scheme: HTTPS
+            exec:
+              command:
+                - sh
+                - -c
+                - curl -k -s https://${HOSTNAME}.{{ include "nifi.fullname" . }}.{{ .Release.Namespace }}:{{ .Values.ports.https }}/nifi
             {{- toYaml .Values.probeTimings.liveness | nindent 12 }}
           {{- end }}
         {{- if .Values.filebeat.enabled }}
@@ -289,14 +283,6 @@ spec:
         {{- end }}
         {{- with .Values.extraVolumes }}
         {{- toYaml . | nindent 8 }}
-        {{- end }}
-        {{- if .Values.encryption.repository.enabled }}
-        {{- with .Values.encryption.repository.secretRef }}
-        - name: secrets
-          secret:
-            secretName: {{ .name }}
-            defaultMode: 0400
-        {{- end }}
         {{- end }}
         {{- with .Values.filebeat }}
         {{- if .enabled }}

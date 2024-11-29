@@ -57,15 +57,6 @@ data:
     prop_add 'nifi.remote.route.http.ingress.port' '443'
     prop_add 'nifi.remote.route.http.ingress.secure' 'true'
 
-    {{- /* Enable repository encryption */}}
-    {{- if .Values.encryption.repository.enabled }}
-    prop_replace 'nifi.repository.encryption.protocol.version' '1'
-    prop_replace 'nifi.repository.encryption.key.id' '{{ .Values.encryption.repository.keyId }}'
-    prop_replace 'nifi.repository.encryption.key.provider' 'KEYSTORE'
-    prop_replace 'nifi.repository.encryption.key.provider.keystore.location' 'conf/{{ .Values.encryption.repository.secretRef.key }}'
-    prop_replace 'nifi.repository.encryption.key.provider.keystore.password' "${KEYSTORE_PASSWORD}"
-    {{- end }}
-
     {{- /* Replace properties not exposed by environment variables */}}
     {{- if .Values.zookeeper.enabled }}
     prop_replace 'nifi.zookeeper.client.secure' 'false'
@@ -87,7 +78,7 @@ data:
     {{- /* Set file and directory paths to persistent locations */}}
     {{- with .Values.persistence }}
     conf_dir='./persistent_conf'
-    prop_replace 'nifi.flow.configuration.json.file' "${conf_dir}/{{ .config.files.flowJson }}"
+    prop_replace 'nifi.flow.configuration.file' "${conf_dir}/{{ .config.files.flowJson }}"
     prop_replace 'nifi.flow.configuration.archive.dir' "${conf_dir}/archive"
 
     sed -i -E "s|(<property name=\"Authorizations File\">).*(</property>)|\1${conf_dir}/{{ .config.files.authorizations }}\2|g" "${authorizers_file}"
