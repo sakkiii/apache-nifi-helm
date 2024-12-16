@@ -15,6 +15,12 @@ global:
     # Annotations to add to the service account
     annotations: { }
 
+  encryption:
+    sensitivePropertiesKey:
+      secretRef:
+        name: ""
+        key: ""
+
   tls:
     certificate:
       duration: 8760h # 365 days
@@ -274,5 +280,10 @@ tolerations: [ ]
 affinity: { }
 
 pdb:
-  enabled: true       # Set to false if you want to disable PDB
-  minAvailable: 1     # Minimum available pods during disruptions
+  zookeeper:
+    enabled: true
+    maxUnavailable: 1
+
+  nifi:
+    enabled: true
+    maxUnavailable: 1

@@ -27,6 +27,13 @@ Create chart name and version as used by the chart label.
 {{- end }}
 
 {{/*
+Create zookeeper name and version as used by the chart label.
+*/}}
+{{- define "zookeeper.name" -}}
+{{ printf "%s-%s" .Release.Name "zookeeper" | trunc 63 | trimSuffix "-" }}
+{{- end }}
+
+{{/*
 Common labels
 */}}
 {{- define "nifi.labels" -}}

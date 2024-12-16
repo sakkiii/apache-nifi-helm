@@ -1,0 +1,17 @@
+{{- if .Values.pdb.nifi.enabled }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "nifi.fullname" . }}-pdb
+  labels:
+    app: {{ include "nifi.name" . }}
+    chart: {{ include "nifi.chart" . }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+spec:
+  maxUnavailable: {{ .Values.pdb.nifi.maxUnavailable | default 1 }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: nifi
+      app.kubernetes.io/instance: {{ .Release.Name }}
+{{- end }}
