@@ -1,4 +1,5 @@
 # Apache NiFi Helm Chart
+[![Publish Helm Chart](https://github.com/sakkiii/apache-nifi-helm/actions/workflows/publish-chart.yml/badge.svg)](https://github.com/sakkiii/apache-nifi-helm/actions/workflows/publish-chart.yml)
 
 This Helm chart deploys Apache NiFi in a Kubernetes cluster, supporting a variety of configurations to meet production requirements for scalability, security, and resilience.
 
