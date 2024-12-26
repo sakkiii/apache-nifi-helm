@@ -23,6 +23,12 @@ global:
         name: ""
         key: password
 
+  encryption:
+    sensitivePropertiesKey:
+      secretRef:
+        name: ""
+        key: ""
+
   oidc:
     oidc_url: ""
     client_id: ""
