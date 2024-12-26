@@ -52,7 +52,12 @@ spec:
             - -c
             - |
               {{- if .Values.persistence.takeOwnershipOnStartup }}
-              chown {{ .Values.securityContext.runAsUser | int64 }}:{{ .Values.securityContext.runAsGroup | int64 }} data/*
+              chown {{ .Values.securityContext.runAsUser | int64 }}:{{ .Values.securityContext.runAsGroup | int64 }} {{ $nifiHome }}/persistent_conf
+              chown {{ .Values.securityContext.runAsUser | int64 }}:{{ .Values.securityContext.runAsGroup | int64 }} {{ $nifiHome }}/state
+              chown {{ .Values.securityContext.runAsUser | int64 }}:{{ .Values.securityContext.runAsGroup | int64 }} {{ $nifiHome }}/logs
+              chown {{ .Values.securityContext.runAsUser | int64 }}:{{ .Values.securityContext.runAsGroup | int64 }} {{ $nifiHome }}/flowfile_repo
+              chown {{ .Values.securityContext.runAsUser | int64 }}:{{ .Values.securityContext.runAsGroup | int64 }} {{ $nifiHome }}/content_repo
+              chown {{ .Values.securityContext.runAsUser | int64 }}:{{ .Values.securityContext.runAsGroup | int64 }} {{ $nifiHome }}/provenance_repo
               {{- end }}
               {{- range .Values.extraTakeOwnershipPaths }}
               chown {{ $.Values.securityContext.runAsUser | int64 }}:{{ $.Values.securityContext.runAsGroup | int64 }} {{ . | quote }}
@@ -61,49 +66,19 @@ spec:
             runAsUser: 0
             runAsNonRoot: false
           volumeMounts:
-            {{- with .Values.persistence.config.volumeMount }}
-            - mountPath: /data/persistent_conf
-              name: {{ .name }}
-              {{- if .subPath }}
-              subPath: {{ .subPath }}
-              {{- end }}
-            {{- end }}
-            {{- with .Values.persistence.state.volumeMount }}
-            - mountPath: /data/state
-              name: {{ .name }}
-              {{- if .subPath }}
-              subPath: {{ .subPath }}
-              {{- end }}
-            {{- end }}
-            {{- with .Values.persistence.logs.volumeMount }}
-            - mountPath: /data/logs
-              name: {{ .name | default "logs" }}
-              {{- if .subPath }}
-              subPath: {{ .subPath }}
-              {{- end }}
-            {{- end }}
+            - name: config
+              mountPath: {{ $nifiHome }}/persistent_conf
+            - name: state
+              mountPath: {{ $nifiHome }}/state
+            - name: logs
+              mountPath: {{ $nifiHome }}/logs
             {{- if .Values.persistence.takeOwnershipOnStartup }}
-            {{- with .Values.persistence.repo.flowfile }}
-            - mountPath: {{ printf "/data/%s" .mountDir }}
-              name: {{ .volumeName }}
-              {{- if .subPath }}
-              subPath: {{ .subPath }}
-              {{- end }}
-            {{- end }}
-            {{- range .Values.persistence.repo.content }}
-            - mountPath: {{ printf "/data/%s" .mountDir }}
-              name: {{ .volumeName }}
-              {{- if .subPath }}
-              subPath: {{ .subPath }}
-              {{- end }}
-            {{- end }}
-            {{- range .Values.persistence.repo.provenance }}
-            - mountPath: {{ printf "/data/%s" .mountDir }}
-              name: {{ .volumeName }}
-              {{- if .subPath }}
-              subPath: {{ .subPath }}
-              {{- end }}
-            {{- end }}
+            - name: flowfile
+              mountPath: {{ $nifiHome }}/flowfile_repo
+            - name: content
+              mountPath: {{ $nifiHome }}/content_repo
+            - name: provenance
+              mountPath: {{ $nifiHome }}/provenance_repo
             {{- end }}
             {{- with .Values.extraVolumeMounts }}
             {{- toYaml . | nindent 12 }}

@@ -15,12 +15,6 @@ global:
     # Annotations to add to the service account
     annotations: { }
 
-  encryption:
-    sensitivePropertiesKey:
-      secretRef:
-        name: ""
-        key: ""
-
   tls:
     certificate:
       duration: 8760h # 365 days
@@ -95,15 +89,15 @@ persistence:
     # By default, repositories are mapped to a single PVC.
     # If multiple PVCs are desired (for instance, having separate content and provenance repos), override the relevant section.
     flowfile:
-      mountDir: flowfile_repository # Relative directory within the container (i.e. /opt/nifi/nifi-current/flowfile_repository)
+      mountDir: flowfile_repo # Relative directory within the container (i.e. /opt/nifi/nifi-current/flowfile_repository)
       volumeName: flowfile # Name of the volume to mount
     content:
       - name: default
-        mountDir: content_repository
+        mountDir: content_repo
         volumeName: content
     provenance:
       - name: default
-        mountDir: provenance_repository
+        mountDir: provenance_repo
         volumeName: provenance
 
 ports:
@@ -280,10 +274,6 @@ tolerations: [ ]
 affinity: { }
 
 pdb:
-  zookeeper:
-    enabled: true
-    maxUnavailable: 1
-
   nifi:
     enabled: true
     maxUnavailable: 1
