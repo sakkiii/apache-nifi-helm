@@ -3,18 +3,18 @@ entries:
   nifi:
   - apiVersion: v2
     appVersion: 1.28.1
-    created: "2024-12-16T11:19:01.870920001Z"
+    created: "2024-12-26T07:16:36.754745249Z"
     dependencies:
     - condition: zookeeper.enabled
       name: zookeeper
       repository: https://charts.bitnami.com/bitnami
       version: 13.4.14
     description: A Helm chart for Apache NiFi
-    digest: 8ad5230afc5b8458ead0265126e3c6e3feea428d2b5bdcf65ca475a587a8383a
+    digest: 8344518da9a14d61ff08e3c14497d1a18f79494fa118c03055bbb73141ddc09c
     icon: https://svn.apache.org/repos/asf/nifi/site/trunk/images/niFi-logo-horizontal-scaled.png
     name: nifi
     type: application
     urls:
     - https://sakkiii.github.io/apache-nifi-helm/nifi-0.3.0.tgz
     version: 0.3.0
-generated: "2024-12-16T11:19:01.867176174Z"
+generated: "2024-12-26T07:16:36.750359234Z"
