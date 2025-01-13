@@ -144,6 +144,21 @@ metrics:
     enabled: false
     interval: 10s
 
+nifiMonitor:
+  ## Monitor NiFi cluster health using NiFi API calls, scrape these call response using prometheus or VM cluster
+  enabled: false
+  replicas: 1
+  resources:
+    limits:
+      memory: "128Mi"
+      cpu: "20m"
+    requests::
+      memory: "64Mi"
+      cpu: "2m"
+  tolerations: []
+  affinity: {}
+  nodeSelector: {}
+
 # Optionally deploy a filebeat sidecar to ship NiFi logs to a receiver
 filebeat:
   enabled: false

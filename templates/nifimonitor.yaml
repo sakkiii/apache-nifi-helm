@@ -1,0 +1,75 @@
+{{- if .Values.nifiMonitor.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "nifi.fullname" . }}-monitor
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: {{ include "nifi.name" . }}-monitor
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  replicas: {{ .Values.nifiMonitor.replicas }}
+  selector:
+    matchLabels:
+      app: {{ include "nifi.name" . }}-monitor
+  template:
+    metadata:
+      labels:
+        app: {{ include "nifi.name" . }}-monitor
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "5000"
+        prometheus.io/path: "/metrics"
+    spec:
+      containers:
+        - name: nifi-monitor
+          image: "sakkiii/nifi_exporter:latest"
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 5000
+          env:
+            - name: BASE_URL
+              value: {{ include "nifi.fullname" . }}.{{ .Release.Namespace }}
+            - name: CERT_FILE
+              value: "/opt/nifiMonitor/tls.crt"
+            - name: KEY_FILE
+              value: "/opt/nifiMonitor/tls.key"
+          volumeMounts:
+            - name: certs
+              mountPath: /opt/nifiMonitor
+              readOnly: true
+          resources:
+            {{- toYaml .Values.nifiMonitor.resources | nindent 12 }}
+      tolerations:
+        {{- toYaml .Values.nifiMonitor.tolerations | nindent 8 }}
+      affinity:
+        {{- toYaml .Values.nifiMonitor.affinity | nindent 8 }}
+      nodeSelector:
+        {{- toYaml .Values.nifiMonitor.nodeSelector | nindent 8 }}
+      volumes:
+        - name: certs
+          secret:
+            secretName: {{ include "nifi.fullname" . }}-tls     # The secret created by cert-manager
+            optional: false                                     # Secret must be present
+      restartPolicy: Always
+{{- end }}
+---
+{{- if .Values.nifiMonitor.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "nifi.fullname" . }}-monitor-service
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: {{ include "nifi.name" . }}-monitor
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  ports:
+    - port: 5000
+      targetPort: 5000
+      protocol: TCP
+      name: metrics
+  selector:
+    app: {{ include "nifi.name" . }}-monitor
+  type: ClusterIP
+{{- end }}
