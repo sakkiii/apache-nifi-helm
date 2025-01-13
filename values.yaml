@@ -52,7 +52,7 @@ shutdown:
 
 ui:
   refreshInterval: 10 sec
-  timeZone: "" # IANA timezone identifier. Time is displayed using this timezone in the UI.
+  timeZone: "Asia/Calcutta" # IANA timezone identifier. Time is displayed using this timezone in the UI.
   maxThreads: "" # Maximum number of Jetty threads to use for UI and HTTP site-to-site connections
 
 tls:
