@@ -9,7 +9,7 @@ metadata:
     release: {{ .Release.Name }}
     heritage: {{ .Release.Service }}
 spec:
-  maxUnavailable: {{ .Values.pdb.nifi.maxUnavailable | default 1 }}
+  maxUnavailable: {{ .Values.pdb.maxUnavailable | default 1 }}
   selector:
     matchLabels:
       app.kubernetes.io/name: nifi
