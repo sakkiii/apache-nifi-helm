@@ -141,6 +141,11 @@ data:
     xmlstarlet ed --inplace --update "//logger[@name='{{ $logger }}']/@level" --value '{{ $level }}' "${logback_file}"
     {{- end }}
 
+    {{- /* Set user logging max size capping */}}
+    {{- range $appender, $size := .Values.logging.totalSizeCap }}
+    xmlstarlet ed -L -s '//appender[@name="{{ $appender }}"]/rollingPolicy' -t elem -n 'totalSizeCap' -v '{{ $size }}' "${logback_file}"
+    {{- end }}
+
     {{- range $key, $value := .Values.extraConfig.nifiProperties }}
     prop_replace {{ $key | squote }} {{ $value | quote }}
     {{- end }}

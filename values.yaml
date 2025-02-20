@@ -71,8 +71,14 @@ encryption:
 
 logging:
   # Override log verbosity settings in conf/logback.xml
-  levels: { }
-#    org.apache.nifi.web.security: DEBUG
+  levels:
+    # org.apache.nifi.web.security: ERROR
+    org.apache.nifi.processors: WARN
+    org.apache.nifi.processors.standard.LogAttribute: WARN
+    org.apache.nifi.processors.standard.LogMessage: WARN
+  totalSizeCap:
+    APP_FILE: 5GB
+    USER_FILE: 2GB
 
 persistence:
   takeOwnershipOnStartup: true
@@ -147,12 +153,15 @@ metrics:
 nifiMonitor:
   ## Monitor NiFi cluster health using NiFi API calls, scrape these call response using prometheus or VM cluster
   enabled: false
+  image:
+    repository: ghcr.io/sakkiii/nifi_exporter
+    tag: latest
   replicas: 1
   resources:
     limits:
       memory: "128Mi"
       cpu: "20m"
-    requests::
+    requests:
       memory: "64Mi"
       cpu: "2m"
   tolerations: []
@@ -295,6 +304,5 @@ tolerations: [ ]
 affinity: { }
 
 pdb:
-  nifi:
-    enabled: true
-    maxUnavailable: 1
+  enabled: true       # Set to false if you want to disable PDB
+  maxUnavailable: 1     # Maximum unavailable pods during disruptions
