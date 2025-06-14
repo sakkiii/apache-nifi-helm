@@ -143,8 +143,16 @@ Comon NiFi OIDC environment variables
   value: {{ .oidc_url | quote }}
 - name: NIFI_SECURITY_USER_OIDC_CLIENT_ID
   value: {{ .client_id | quote }}
+{{- if .client_secretFrom }}
+- name: NIFI_SECURITY_USER_OIDC_CLIENT_SECRET
+  valueFrom:
+    secretKeyRef:
+      name: {{ .client_secretFrom.secretName | quote }}
+      key: {{ .client_secretFrom.secretKey | quote }}
+{{- else if .client_secret }}
 - name: NIFI_SECURITY_USER_OIDC_CLIENT_SECRET
   value: {{ .client_secret | quote }}
+{{- end }}
 - name: NIFI_SECURITY_USER_OIDC_CLAIM_IDENTIFYING_USER
   value: {{ .claim_identifying_user | quote }}
 - name: INITIAL_ADMIN_IDENTITY

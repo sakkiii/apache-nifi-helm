@@ -33,6 +33,7 @@ global:
     oidc_url: ""
     client_id: ""
     client_secret: ""
+    client_secretFrom: ""
     claim_identifying_user: "preferred_username"
     initial_admin_identity: ""
 
