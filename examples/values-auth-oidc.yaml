@@ -1,0 +1,35 @@
+# Example values file for Apache NiFi with OIDC Authentication
+# This file demonstrates OIDC authentication configuration
+# Note: Basic auth is automatically disabled when OIDC is enabled
+
+# Basic cluster configuration
+global:
+  nifi:
+    nodeCount: 3
+  # Authentication configuration
+  auth:
+    # Basic auth (automatically disabled when OIDC is enabled)
+    basic:
+      admin_username: "admin"
+      admin_password: "your32characterpasswordhere123"
+    
+    # LDAP is disabled
+    ldap:
+      enabled: false
+    
+    # OpenID Connect (OIDC) Authentication
+    oidc:
+      enabled: true
+      oidc_url: "https://auth.example.com/.well-known/openid-configuration"
+      client_id: "nifi-client"
+      client_secret: "your-client-secret-here"
+      claim_identifying_user: "preferred_username"
+      initial_admin_identity: "admin@example.com"
+
+ingress:
+  enabled: true
+  ingressClassName: alb
+  hostName: example.com # nifi.example.com
+  siteToSite:
+    subDomain: s2s # Subdomain for site-to-site traffic (e.g. s2s.example.com)
+  annotations: { }

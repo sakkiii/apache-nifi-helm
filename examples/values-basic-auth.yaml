@@ -1,0 +1,40 @@
+# Example values for NiFi with Basic Authentication (Single User Authentication)
+# Basic auth only supports single-node deployment
+
+global:
+  busybox:
+    repository: public.ecr.aws/docker/library/busybox:stable
+
+  nifi:
+    nodeCount: 1  # REQUIRED: Basic auth only supports single node
+
+  # Basic Authentication Configuration
+  # This is the default fallback when OIDC and LDAP are disabled
+  basic:
+    admin_username: "admin"
+    admin_password: "your32characterpasswordhere123"  # Must be at least 12 characters
+
+# Resource configuration for single node
+resources:
+  requests:
+    memory: "2Gi"
+    cpu: "1000m"
+  limits:
+    memory: "4Gi"
+    cpu: "2000m"
+
+
+# Persistence configuration
+persistence:
+  enabled: true
+  storageClass: "gp3"
+  accessModes:
+    - ReadWriteOnce
+  size:
+    config: 1Gi
+    data: 10Gi
+    flowfile: 10Gi
+    content: 10Gi
+    provenance: 10Gi
+    logs: 5Gi
+    state: 1Gi

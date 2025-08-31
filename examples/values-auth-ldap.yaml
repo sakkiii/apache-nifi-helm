@@ -1,0 +1,42 @@
+# Example values file for Apache NiFi with LDAP Authentication
+# This file demonstrates LDAP authentication configuration
+# Note: Basic auth is automatically disabled when LDAP is enabled
+
+# Basic cluster configuration
+global:
+  nifi:
+    nodeCount: 3
+  # Authentication configuration
+  auth:
+    # Basic auth (automatically disabled when LDAP is enabled)
+    basic:
+      admin_username: "admin"
+      admin_password: "your32characterpasswordhere123"
+    
+    # LDAP Authentication
+    ldap:
+      enabled: true
+      url: "ldaps://dc-1.example.com:636,ldaps://dc-2.example.com:636"
+      tlsProtocol: "TLSv1.2"
+      authenticationStrategy: "LDAPS"  # ANONYMOUS|SIMPLE|LDAPS|START_TLS
+      identityStrategy: "USE_USERNAME"  # USE_DN|USE_USERNAME
+      initialAdminIdentity: "CN=Administrator,DC=example,DC=com"
+      manager:
+        distinguishedName: "CN=Administrator,DC=example,DC=com"
+        passwordSecretRef:
+          name: "ldap-manager-secret"
+          key: "password"
+      userSearchBase: "DC=example,DC=com"
+      userSearchFilter: "sAMAccountName={0}"
+    
+    # OIDC is disabled
+    oidc:
+      enabled: false
+
+ingress:
+  enabled: true
+  ingressClassName: alb
+  hostName: example.com # nifi.example.com
+  siteToSite:
+    subDomain: s2s # Subdomain for site-to-site traffic (e.g. s2s.example.com)
+  annotations: { }
