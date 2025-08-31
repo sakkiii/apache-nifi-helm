@@ -4,28 +4,60 @@
 
 # Basic cluster configuration
 global:
+  busybox:
+    repository: public.ecr.aws/docker/library/busybox:stable
   nifi:
     nodeCount: 3
-  # Authentication configuration
-  auth:
-    # Basic auth (automatically disabled when OIDC is enabled)
-    basic:
-      admin_username: "admin"
-      admin_password: "your32characterpasswordhere123"
+  # Authentication Configuration
+  # Basic auth (automatically disabled when OIDC is enabled)
+  basic:
+    admin_username: "admin"
+    admin_password: "your32characterpasswordhere123"  # Must be at least 12 characters
     
-    # LDAP is disabled
-    ldap:
-      enabled: false
-    
-    # OpenID Connect (OIDC) Authentication
-    oidc:
-      enabled: true
-      oidc_url: "https://auth.example.com/.well-known/openid-configuration"
-      client_id: "nifi-client"
-      client_secret: "your-client-secret-here"
-      claim_identifying_user: "preferred_username"
-      initial_admin_identity: "admin@example.com"
+  # LDAP is disabled
+  ldap:
+    enabled: false
+  
+  # OpenID Connect (OIDC) Authentication
+  oidc:
+    enabled: true
+    oidc_url: "https://auth.example.com/.well-known/openid-configuration"
+    client_id: "nifi-client"
+    client_secret: "your-client-secret-here"
+    claim_identifying_user: "preferred_username"
+    initial_admin_identity: "admin@example.com"
 
+# Resource configuration for single node
+resources:
+  requests:
+    memory: "2Gi"
+    cpu: "1000m"
+  limits:
+    memory: "4Gi"
+    cpu: "2000m"
+
+# Storage configuration
+volumeClaims:
+  config:
+    storageClass: "gp3"
+    size: "5Gi"
+  state:
+    storageClass: "gp3"
+    size: "10Gi"
+  logs:
+    storageClass: "gp3"
+    size: "2Gi"
+  flowfile:
+    storageClass: "gp3"
+    size: "10Gi"
+  content:
+    storageClass: "gp3"
+    size: "15Gi"
+  provenance:
+    storageClass: "gp3"
+    size: "10Gi"
+
+# Your specific ALB ingress configuration
 ingress:
   enabled: true
   ingressClassName: alb
@@ -33,3 +65,13 @@ ingress:
   siteToSite:
     subDomain: s2s # Subdomain for site-to-site traffic (e.g. s2s.example.com)
   annotations: { }
+
+# JVM Heap configuration for single node
+jvmHeap:
+  min: 512m
+  max: 1g
+
+# Node selector and tolerations (adjust as needed for your cluster)
+nodeSelector: {}
+tolerations: []
+affinity: {}
