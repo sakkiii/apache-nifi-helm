@@ -44,6 +44,9 @@ jobs:
   # ==========================================
   # VALIDATION & TESTING JOB
   # ==========================================
+  # This job runs on both PRs and main branch pushes
+  # - On PRs: Only validates and tests (no publishing)
+  # - On main: Validates and provides outputs for publishing
   validate:
     name: 🔍 Validate & Test Chart
     runs-on: ubuntu-22.04
@@ -150,6 +153,10 @@ jobs:
   # ==========================================
   # PUBLISH JOB (Only on main branch)
   # ==========================================
+  # This job only runs on main branch pushes when:
+  # - Version has changed (new chart version)
+  # - Force publish is requested via workflow_dispatch
+  # PRs will NOT trigger this job (only validation)
   publish:
     name: 📦 Package & Publish Chart
     runs-on: ubuntu-22.04
