@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       bump_type:
-        description: 'Type of version bump'
+        description: 'Version bump type'
         required: true
         default: 'patch'
         type: choice
@@ -13,209 +13,62 @@ on:
           - minor
           - major
       nifi_version:
-        description: 'NiFi version (appVersion) - optional'
-        required: false
-        type: string
-      description:
-        description: 'Release description'
+        description: 'NiFi version (optional)'
         required: false
         type: string
 
 jobs:
   bump-version:
-    name: 🏷️ Bump Chart Version
+    name: 🏷️ Bump Version
     runs-on: ubuntu-22.04
     
-    permissions:
-      contents: write
-      pull-requests: write
-    
     steps:
-      - name: 📥 Checkout Repository
+      - name: 📥 Checkout
         uses: actions/checkout@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          fetch-depth: 0
 
-      - name: 🛠️ Set up Node.js
+      - name: 🔧 Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
 
-      - name: 📦 Install semver tool
+      - name: 📦 Install semver
         run: npm install -g semver
 
-      - name: 📊 Get Current Version
-        id: current-version
+      - name: 🏷️ Bump Chart Version
+        id: bump
         run: |
           CURRENT_VERSION=$(yq eval '.version' Chart.yaml)
-          CURRENT_APP_VERSION=$(yq eval '.appVersion' Chart.yaml)
-          echo "current=$CURRENT_VERSION" >> $GITHUB_OUTPUT
-          echo "current-app=$CURRENT_APP_VERSION" >> $GITHUB_OUTPUT
-          echo "📋 Current Chart Version: $CURRENT_VERSION"
-          echo "📋 Current App Version: $CURRENT_APP_VERSION"
-
-      - name: 🔢 Calculate New Version
-        id: new-version
-        run: |
-          CURRENT="${{ steps.current-version.outputs.current }}"
-          BUMP_TYPE="${{ github.event.inputs.bump_type }}"
+          NEW_VERSION=$(semver -i ${{ github.event.inputs.bump_type }} $CURRENT_VERSION)
           
-          NEW_VERSION=$(semver -i $BUMP_TYPE $CURRENT)
-          echo "new=$NEW_VERSION" >> $GITHUB_OUTPUT
-          echo "✨ New Chart Version: $NEW_VERSION"
+          echo "current-version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+          echo "new-version=$NEW_VERSION" >> $GITHUB_OUTPUT
           
-          # Set NiFi version if provided
+          # Update Chart.yaml
+          yq eval ".version = \"$NEW_VERSION\"" -i Chart.yaml
+          
+          # Update NiFi version if provided
           if [ -n "${{ github.event.inputs.nifi_version }}" ]; then
+            yq eval ".appVersion = \"${{ github.event.inputs.nifi_version }}\"" -i Chart.yaml
             echo "nifi-version=${{ github.event.inputs.nifi_version }}" >> $GITHUB_OUTPUT
-            echo "✨ New NiFi Version: ${{ github.event.inputs.nifi_version }}"
-          else
-            echo "nifi-version=${{ steps.current-version.outputs.current-app }}" >> $GITHUB_OUTPUT
-            echo "📋 Keeping NiFi Version: ${{ steps.current-version.outputs.current-app }}"
           fi
 
-      - name: 📝 Update Chart.yaml
+      - name: 📝 Commit Changes
         run: |
-          NEW_CHART_VERSION="${{ steps.new-version.outputs.new }}"
-          NEW_NIFI_VERSION="${{ steps.new-version.outputs.nifi-version }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
           
-          # Update chart version
-          yq eval ".version = \"$NEW_CHART_VERSION\"" -i Chart.yaml
-          
-          # Update app version if provided
-          if [ "$NEW_NIFI_VERSION" != "${{ steps.current-version.outputs.current-app }}" ]; then
-            yq eval ".appVersion = \"$NEW_NIFI_VERSION\"" -i Chart.yaml
-          fi
-          
-          echo "📝 Updated Chart.yaml:"
-          cat Chart.yaml
+          git add Chart.yaml
+          git commit -m "chore: bump version to ${{ steps.bump.outputs.new-version }}"
+          git push
 
-      - name: 📋 Generate Changelog Entry
-        id: changelog
-        run: |
-          NEW_VERSION="${{ steps.new-version.outputs.new }}"
-          CURRENT_VERSION="${{ steps.current-version.outputs.current }}"
-          BUMP_TYPE="${{ github.event.inputs.bump_type }}"
-          DESCRIPTION="${{ github.event.inputs.description }}"
-          DATE=$(date +%Y-%m-%d)
-          
-          # Create changelog entry
-          cat > changelog-entry.md << EOF
-          ## [$NEW_VERSION] - $DATE
-          
-          ### $(echo $BUMP_TYPE | tr '[:lower:]' '[:upper:]') Release
-          
-          EOF
-          
-          if [ -n "$DESCRIPTION" ]; then
-            echo "$DESCRIPTION" >> changelog-entry.md
-            echo "" >> changelog-entry.md
-          fi
-          
-          # Add default entries based on bump type
-          case $BUMP_TYPE in
-            "major")
-              cat >> changelog-entry.md << EOF
-          ### Changed
-          - Major version bump with breaking changes
-          - Please review the upgrade guide before updating
-          
-          ### Migration Guide
-          - Check the documentation for migration steps
-          - Test thoroughly in staging environment
-          EOF
-              ;;
-            "minor")
-              cat >> changelog-entry.md << EOF
-          ### Added
-          - New features and enhancements
-          - Backward compatible changes
-          
-          ### Enhanced
-          - Improved functionality and performance
-          EOF
-              ;;
-            "patch")
-              cat >> changelog-entry.md << EOF
-          ### Fixed
-          - Bug fixes and improvements
-          - Security updates and patches
-          
-          ### Updated
-          - Documentation and examples
-          EOF
-              ;;
-          esac
-          
-          if [ "${{ steps.new-version.outputs.nifi-version }}" != "${{ steps.current-version.outputs.current-app }}" ]; then
-            cat >> changelog-entry.md << EOF
-          
-          ### Updated
-          - Apache NiFi version updated to ${{ steps.new-version.outputs.nifi-version }}
-          EOF
-          fi
-          
-          echo "📋 Generated changelog entry:"
-          cat changelog-entry.md
-
-      - name: 🔄 Create Pull Request
-        uses: peter-evans/create-pull-request@v5
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          commit-message: |
-            chore: bump version to ${{ steps.new-version.outputs.new }}
-            
-            - Chart version: ${{ steps.current-version.outputs.current }} → ${{ steps.new-version.outputs.new }}
-            - App version: ${{ steps.current-version.outputs.current-app }} → ${{ steps.new-version.outputs.nifi-version }}
-            - Bump type: ${{ github.event.inputs.bump_type }}
-          title: "🏷️ Version Bump: v${{ steps.new-version.outputs.new }}"
-          body: |
-            ## 🏷️ Version Bump: ${{ github.event.inputs.bump_type }}
-            
-            This PR bumps the chart version from `${{ steps.current-version.outputs.current }}` to `${{ steps.new-version.outputs.new }}`.
-            
-            ### 📋 Changes
-            - **Chart Version**: `${{ steps.current-version.outputs.current }}` → `${{ steps.new-version.outputs.new }}`
-            - **App Version**: `${{ steps.current-version.outputs.current-app }}` → `${{ steps.new-version.outputs.nifi-version }}`
-            - **Bump Type**: `${{ github.event.inputs.bump_type }}`
-            
-            ### 📝 Description
-            ${{ github.event.inputs.description || 'Automated version bump' }}
-            
-            ### 🔄 Next Steps
-            1. Review the changes
-            2. Merge this PR to trigger chart publication
-            3. GitHub Actions will automatically:
-               - Create a Git tag
-               - Publish to Helm repository
-               - Create a GitHub release
-            
-            ### 📚 Changelog Entry
-            ```markdown
-            $(cat changelog-entry.md)
-            ```
-            
-            ---
-            
-            **🤖 This PR was created automatically by the Version Bump workflow.**
-          branch: version-bump/v${{ steps.new-version.outputs.new }}
-          delete-branch: true
-          labels: |
-            version-bump
-            ${{ github.event.inputs.bump_type }}
-            automated
-
-      - name: 📢 Summary
+      - name: 📊 Summary
         run: |
           echo "## 🏷️ Version Bump Summary" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Field | Before | After |" >> $GITHUB_STEP_SUMMARY
-          echo "|-------|--------|-------|" >> $GITHUB_STEP_SUMMARY
-          echo "| Chart Version | \`${{ steps.current-version.outputs.current }}\` | \`${{ steps.new-version.outputs.new }}\` |" >> $GITHUB_STEP_SUMMARY
-          echo "| App Version | \`${{ steps.current-version.outputs.current-app }}\` | \`${{ steps.new-version.outputs.nifi-version }}\` |" >> $GITHUB_STEP_SUMMARY
-          echo "| Bump Type | - | \`${{ github.event.inputs.bump_type }}\` |" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### 🔄 Next Steps" >> $GITHUB_STEP_SUMMARY
-          echo "1. Review and merge the created pull request" >> $GITHUB_STEP_SUMMARY
-          echo "2. Chart will be automatically published upon merge" >> $GITHUB_STEP_SUMMARY
-          echo "3. GitHub release will be created with changelog" >> $GITHUB_STEP_SUMMARY
+          echo "- **Previous Version**: ${{ steps.bump.outputs.current-version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **New Version**: ${{ steps.bump.outputs.new-version }}" >> $GITHUB_STEP_SUMMARY
+          if [ -n "${{ steps.bump.outputs.nifi-version }}" ]; then
+            echo "- **NiFi Version**: ${{ steps.bump.outputs.nifi-version }}" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "- **Bump Type**: ${{ github.event.inputs.bump_type }}" >> $GITHUB_STEP_SUMMARY
