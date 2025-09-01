@@ -1,27 +1,52 @@
 apiVersion: v2
 name: nifi
-description: A Helm chart for Apache NiFi
+description: Production-ready Apache NiFi Helm chart with enterprise authentication, high availability, and advanced security features
 
-# A chart can be either an 'application' or a 'library' chart.
-#
-# Application charts are a collection of templates that can be packaged into versioned archives
-# to be deployed.
-#
-# Library charts provide useful utilities or functions for the chart developer. They're included as
-# a dependency of application charts to inject those utilities and functions into the rendering
-# pipeline. Library charts do not define any templates and therefore cannot be deployed.
+# Chart type - application chart for deployment
 type: application
 
 # This is the chart version. This version number should be incremented each time you make changes
 # to the chart and its templates, including the app version.
 # Versions are expected to follow Semantic Versioning (https://semver.org/)
-version: 0.5.0
+version: 0.6.0
 
 # This is the version number of the application being deployed. This version number should be
 # incremented each time you make changes to the application. Versions are not expected to
 # follow Semantic Versioning. They should reflect the version the application is using.
 # It is recommended to use it with quotes.
 appVersion: "1.28.1"
+
+# Chart metadata
+home: https://github.com/sakkiii/apache-nifi-helm
+sources:
+  - https://github.com/sakkiii/apache-nifi-helm
+  - https://github.com/apache/nifi
+maintainers:
+  - name: sakkiii
+    email: saket@example.com
+    url: https://github.com/sakkiii
+
+# Keywords for discoverability
+keywords:
+  - nifi
+  - apache
+  - dataflow
+  - etl
+  - streaming
+  - data-processing
+  - enterprise
+  - authentication
+  - clustering
+
+# Annotations
+annotations:
+  category: Analytics
+  licenses: Apache-2.0
+  images: |
+    - name: nifi
+      image: apache/nifi:1.28.1
+    - name: zookeeper
+      image: bitnami/zookeeper:3.9.2-debian-12-r7
 
 dependencies:
   - condition: zookeeper.enabled

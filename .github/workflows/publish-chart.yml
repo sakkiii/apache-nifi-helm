@@ -1,50 +1,169 @@
-name: Publish Helm Chart
+name: 📦 Publish Helm Chart
 
 on:
   push:
     branches:
       - main
+    paths:
+      - 'Chart.yaml'
+      - 'values.yaml'
+      - 'templates/**'
+      - 'examples/**'
   workflow_dispatch:
-
-env:
-  CHART_PATH: .  # Default path, can be overridden in repository settings
-  REPO_URL: ${{ secrets.REPO_URL }}  # Repository URL stored as a secret for security
 
 jobs:
   publish:
+    name: 📦 Publish Chart
     runs-on: ubuntu-22.04
-
+    
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    
     steps:
-      - name: Check out code
-        uses: actions/checkout@v4  # Use the latest version of checkout
-
-      - name: Set up Helm
-        uses: azure/setup-helm@v4.2.0  # Official Azure setup for Helm
-        # with:
-        #   version: '3.12.0'  # Specify the Helm version
-
-      - name: Lint Helm Chart  # Optional step to validate the Helm chart
-        run: |
-          helm lint "${{ env.CHART_PATH }}"
-
-      - name: Update Helm Dependencies
-        run: |
-          helm dependency update "${{ env.CHART_PATH }}"
-
-      - name: Package Helm Chart
-        run: |
-          helm package "${{ env.CHART_PATH }}" -d packaged-charts/
-
-      - name: Generate Helm Index
-        run: |
-          helm repo index packaged-charts/ --url "${{ env.REPO_URL }}"
-
-      - name: Deploy to GitHub Pages
-        if: success()
-        uses: peaceiris/actions-gh-pages@v4
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: packaged-charts
-          publish_branch: gh-pages
-          user_name: "github-actions[bot]"
-          user_email: "github-actions[bot]@users.noreply.github.com"
+          fetch-depth: 0
+
+      - name: 🛠️ Set up Helm
+        uses: azure/setup-helm@v4.2.0
+        with:
+          version: '3.14.0'
+
+      - name: 📊 Extract Chart Information
+        id: chart-info
+        run: |
+          VERSION=$(yq eval '.version' Chart.yaml)
+          APP_VERSION=$(yq eval '.appVersion' Chart.yaml)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "app-version=$APP_VERSION" >> $GITHUB_OUTPUT
+          echo "📋 Chart Version: $VERSION"
+          echo "📋 App Version: $APP_VERSION"
+
+      - name: 🔍 Lint Helm Chart
+        run: |
+          echo "🔍 Linting Helm chart..."
+          helm lint .
+
+      - name: 📦 Update Dependencies
+        run: |
+          echo "📦 Updating Helm dependencies..."
+          helm dependency update .
+
+      - name: 🧪 Template Validation
+        run: |
+          echo "🧪 Validating Helm templates..."
+          
+          # Test with example value files if they exist
+          if ls examples/values-*.yaml 1> /dev/null 2>&1; then
+            for values_file in examples/values-*.yaml; do
+              echo "Testing with $values_file"
+              helm template test-release . -f "$values_file" --debug > /dev/null
+            done
+          fi
+          
+          # Test default values
+          helm template test-release . --debug > /dev/null
+          echo "✅ All template validations passed"
+
+      - name: 🔄 Check Version Changes
+        id: version-check
+        run: |
+          CURRENT_VERSION="${{ steps.chart-info.outputs.version }}"
+          
+          # Check if this version already exists in releases
+          if git tag --list | grep -q "^v$CURRENT_VERSION$"; then
+            echo "changed=false" >> $GITHUB_OUTPUT
+            echo "⚠️ Version $CURRENT_VERSION already exists - skipping publish"
+          else
+            echo "changed=true" >> $GITHUB_OUTPUT
+            echo "✅ New version $CURRENT_VERSION detected - will publish"
+          fi
+
+      - name: 📦 Package Chart
+        if: steps.version-check.outputs.changed == 'true'
+        run: |
+          echo "📦 Packaging Helm chart..."
+          helm package . --destination ./packages/
+          
+          echo "📋 Package contents:"
+          ls -la ./packages/
+
+      - name: 🏷️ Create Git Tag
+        if: steps.version-check.outputs.changed == 'true'
+        run: |
+          VERSION="${{ steps.chart-info.outputs.version }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "v$VERSION" -m "Release version $VERSION"
+          git push origin "v$VERSION"
+
+      - name: 📤 Configure Pages
+        if: steps.version-check.outputs.changed == 'true'
+        uses: actions/configure-pages@v4
+
+      - name: 🌐 Update Helm Repository Index
+        if: steps.version-check.outputs.changed == 'true'
+        run: |
+          echo "🌐 Setting up Helm repository..."
+          
+          # Create or update index
+          if [ -f "index.yaml" ]; then
+            helm repo index ./packages --url https://sakkiii.github.io/apache-nifi-helm --merge index.yaml
+          else
+            helm repo index ./packages --url https://sakkiii.github.io/apache-nifi-helm
+          fi
+          
+          # Move updated index to root
+          cp ./packages/index.yaml ./index.yaml
+          
+          echo "📋 Repository index updated"
+
+      - name: 📤 Upload Pages Artifact
+        if: steps.version-check.outputs.changed == 'true'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./packages
+
+      - name: 🚀 Deploy to GitHub Pages
+        if: steps.version-check.outputs.changed == 'true'
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+      - name: 📢 Create GitHub Release
+        if: steps.version-check.outputs.changed == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.chart-info.outputs.version }}
+          name: Apache NiFi Helm Chart v${{ steps.chart-info.outputs.version }}
+          body: |
+            ## Apache NiFi Helm Chart v${{ steps.chart-info.outputs.version }}
+            
+            **Chart Version**: ${{ steps.chart-info.outputs.version }}  
+            **App Version**: ${{ steps.chart-info.outputs.app-version }}
+            
+            ### Installation
+            ```bash
+            helm repo add apache-nifi-helm https://sakkiii.github.io/apache-nifi-helm
+            helm install my-nifi apache-nifi-helm/nifi --version ${{ steps.chart-info.outputs.version }}
+            ```
+          draft: false
+          prerelease: false
+
+      - name: 📊 Summary
+        if: always()
+        run: |
+          echo "## 📊 Workflow Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Chart Version**: ${{ steps.chart-info.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **App Version**: ${{ steps.chart-info.outputs.app-version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Version Changed**: ${{ steps.version-check.outputs.changed }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Repository**: [https://sakkiii.github.io/apache-nifi-helm](https://sakkiii.github.io/apache-nifi-helm)" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ steps.version-check.outputs.changed }}" == "true" ]; then
+            echo "- **Status**: ✅ **Published Successfully**" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- **Status**: ⏭️ **Skipped (Version Unchanged)**" >> $GITHUB_STEP_SUMMARY
+          fi

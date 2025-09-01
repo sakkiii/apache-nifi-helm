@@ -1,0 +1,74 @@
+name: 🏷️ Version Bump
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump_type:
+        description: 'Version bump type'
+        required: true
+        default: 'patch'
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+      nifi_version:
+        description: 'NiFi version (optional)'
+        required: false
+        type: string
+
+jobs:
+  bump-version:
+    name: 🏷️ Bump Version
+    runs-on: ubuntu-22.04
+    
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 🔧 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: 📦 Install semver
+        run: npm install -g semver
+
+      - name: 🏷️ Bump Chart Version
+        id: bump
+        run: |
+          CURRENT_VERSION=$(yq eval '.version' Chart.yaml)
+          NEW_VERSION=$(semver -i ${{ github.event.inputs.bump_type }} $CURRENT_VERSION)
+          
+          echo "current-version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+          echo "new-version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          
+          # Update Chart.yaml
+          yq eval ".version = \"$NEW_VERSION\"" -i Chart.yaml
+          
+          # Update NiFi version if provided
+          if [ -n "${{ github.event.inputs.nifi_version }}" ]; then
+            yq eval ".appVersion = \"${{ github.event.inputs.nifi_version }}\"" -i Chart.yaml
+            echo "nifi-version=${{ github.event.inputs.nifi_version }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: 📝 Commit Changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+          git add Chart.yaml
+          git commit -m "chore: bump version to ${{ steps.bump.outputs.new-version }}"
+          git push
+
+      - name: 📊 Summary
+        run: |
+          echo "## 🏷️ Version Bump Summary" >> $GITHUB_STEP_SUMMARY
+          echo "- **Previous Version**: ${{ steps.bump.outputs.current-version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **New Version**: ${{ steps.bump.outputs.new-version }}" >> $GITHUB_STEP_SUMMARY
+          if [ -n "${{ steps.bump.outputs.nifi-version }}" ]; then
+            echo "- **NiFi Version**: ${{ steps.bump.outputs.nifi-version }}" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "- **Bump Type**: ${{ github.event.inputs.bump_type }}" >> $GITHUB_STEP_SUMMARY
