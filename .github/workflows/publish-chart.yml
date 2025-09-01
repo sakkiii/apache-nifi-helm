@@ -17,7 +17,7 @@ jobs:
     runs-on: ubuntu-22.04
     
     permissions:
-      contents: read
+      contents: write  # Need write access for tags and releases
       pages: write
       id-token: write
     
@@ -91,14 +91,18 @@ jobs:
           echo "📋 Package contents:"
           ls -la ./packages/
 
-      - name: 🏷️ Create Git Tag
+      - name: 🏷️ Prepare Git Tag
         if: steps.version-check.outputs.changed == 'true'
         run: |
           VERSION="${{ steps.chart-info.outputs.version }}"
+          echo "🏷️ Preparing for tag v$VERSION"
+          
+          # Configure Git
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git tag -a "v$VERSION" -m "Release version $VERSION"
-          git push origin "v$VERSION"
+          
+          # Note: Tag will be created automatically by the GitHub Release action
+          echo "✅ Git configuration ready for tag v$VERSION"
 
       - name: 📤 Configure Pages
         if: steps.version-check.outputs.changed == 'true'
