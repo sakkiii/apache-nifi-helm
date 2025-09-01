@@ -7,7 +7,7 @@ global:
     repository: public.ecr.aws/docker/library/busybox:stable
 
   nifi:
-    nodeCount: 3
+    nodeCount: 1  # Default to 1 node since basic auth (default) doesn't support clustering
 
   serviceAccount:
     # Name of the existing service account to use. If not defined, one is created.
@@ -20,16 +20,49 @@ global:
       duration: 8760h # 365 days
       renewBefore: 168h # 7 days
       keystorePasswordSecretRef:
-        name: ""
+        # Use default auto-generated secret, or specify existing secret name
+        name: "certificate-keystore-password"
         key: password
 
   encryption:
     sensitivePropertiesKey:
+      # Use default auto-generated secret, or specify existing secret name
       secretRef:
+        name: "encryption-sensitive-key"
+        key: "sensitivekey"
+
+  # Authentication is automatically determined by priority:
+  # 1. OIDC (if enabled) - highest priority
+  # 2. LDAP (if OIDC disabled and LDAP enabled) - second priority  
+  # 3. Basic Auth (if both OIDC and LDAP disabled) - default fallback
+  
+  # Single User Authentication (default fallback)
+  # Uses NiFi's built-in Single User Authentication
+  # Note: Basic auth is automatically disabled when OIDC or LDAP is enabled
+  # IMPORTANT: Basic auth only supports single-node deployment (nodeCount: 1)
+  basic:
+    admin_username: "admin"
+    admin_password: "your32characterpasswordhere123"  # Must be at least 12 characters
+  
+  # LDAP Authentication
+  ldap:
+    enabled: false
+    url: "" # ldaps://dc-1.example.com:636,ldaps://dc-2.example.com:636
+    tlsProtocol: TLSv1.2
+    authenticationStrategy: LDAPS # ANONYMOUS|SIMPLE|LDAPS|START_TLS
+    identityStrategy: USE_USERNAME # USE_DN|USE_USERNAME
+    initialAdminIdentity: "" # CN=Administrator,DC=example,DC=com
+    manager:
+      distinguishedName: "" # CN=Administrator,DC=example,DC=com
+      passwordSecretRef:
         name: ""
         key: ""
-
+    userSearchBase: "" # DC=example,DC=com
+    userSearchFilter: sAMAccountName={0}
+  
+  # OpenID Connect (OIDC) Authentication
   oidc:
+    enabled: false
     oidc_url: ""
     client_id: ""
     client_secret: ""
@@ -135,8 +168,14 @@ zookeeper:
   port: 2181
   rootNode: "/data"
   replicaCount: 3
+  metrics:
+    enabled: true
   traffic:
     maxThreads: 100 # Max number of threads used for inter-node communication
+  ## Set container resources according to one common 
+  ## preset allowed values: none, nano, micro, small, medium, large, xlarge, 2xlarge. 
+  ## This is ignored if resources is set
+  resourcesPreset: small
 
 metrics:
   # Expose metrics for each node via Ingress
@@ -303,6 +342,7 @@ probeTimings:
 nodeSelector: { }
 tolerations: [ ]
 affinity: { }
+topologySpreadConstraints: []
 
 pdb:
   enabled: true       # Set to false if you want to disable PDB

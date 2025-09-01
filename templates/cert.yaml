@@ -32,7 +32,12 @@ spec:
     pkcs12:
       create: true
       passwordSecretRef:
+        {{- if .keystorePasswordSecretRef.name }}
         {{- toYaml .keystorePasswordSecretRef | nindent 8 }}
+        {{- else }}
+        name: {{ printf "%s-keystore-password" (include "nifi.fullname" $) | quote }}
+        key: {{ default "password" .keystorePasswordSecretRef.key | quote }}
+        {{- end }}
   {{- end }}
   issuerRef:
     name: {{ include "nifi.fullname" . }}

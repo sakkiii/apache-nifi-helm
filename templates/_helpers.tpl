@@ -111,7 +111,7 @@ Returns whether `.Values.extraPorts` contains one or more entries with either `n
 {{- end }}
 
 {{/*
-Common NiFi/Registry keystore environment variables
+Common NiFi keystore environment variables
 */}}
 {{- define "nifi.keystoreEnvironment" -}}
 - name: KEYSTORE_PATH
@@ -121,7 +121,8 @@ Common NiFi/Registry keystore environment variables
 - name: KEYSTORE_PASSWORD
   valueFrom:
     secretKeyRef:
-      {{- toYaml .Values.global.tls.certificate.keystorePasswordSecretRef | nindent 6 }}
+      name: {{ default "certificate-keystore-password" .Values.global.tls.certificate.keystorePasswordSecretRef.name | quote }}
+      key: {{ .Values.global.tls.certificate.keystorePasswordSecretRef.key | quote }}
 - name: TRUSTSTORE_PATH
   value: {{ include "nifi.tlsPath" . }}/truststore.p12
 - name: TRUSTSTORE_TYPE
@@ -129,11 +130,12 @@ Common NiFi/Registry keystore environment variables
 - name: TRUSTSTORE_PASSWORD
   valueFrom:
     secretKeyRef:
-      {{- toYaml .Values.global.tls.certificate.keystorePasswordSecretRef | nindent 6 }}
+      name: {{ default "certificate-keystore-password" .Values.global.tls.certificate.keystorePasswordSecretRef.name | quote }}
+      key: {{ .Values.global.tls.certificate.keystorePasswordSecretRef.key | quote }}
 {{- end }}
 
 {{/*
-Comon NiFi OIDC environment variables
+Common NiFi OIDC environment variables
 */}}
 {{- define "nifi.oidcEnvironment" -}}
 {{- with .Values.global.oidc -}}
@@ -161,7 +163,7 @@ Comon NiFi OIDC environment variables
 {{- end }}
 
 {{/*
-Comon NiFi LDAP environment variables
+Common NiFi LDAP environment variables
 */}}
 {{- define "nifi.ldapEnvironment" -}}
 {{- with .Values.global.ldap -}}
@@ -207,3 +209,22 @@ Comon NiFi LDAP environment variables
 {{- end }}
 {{- end }}
 {{- end }}
+
+{{/*
+Common NiFi Basic Authentication environment variables
+Uses official NiFi Single User Authentication environment variables
+Automatically disabled if OIDC or LDAP is enabled
+*/}}
+{{- define "nifi.basicAuthEnvironment" -}}
+{{- /* Only enable basic auth if both OIDC and LDAP are disabled */ -}}
+{{- if and (not .Values.global.oidc.enabled) (not .Values.global.ldap.enabled) -}}
+{{- with .Values.global.basic -}}
+- name: AUTH
+  value: single-user
+- name: SINGLE_USER_CREDENTIALS_USERNAME
+  value: {{ .admin_username | quote }}
+- name: SINGLE_USER_CREDENTIALS_PASSWORD
+  value: {{ .admin_password | quote }}
+{{- end -}}
+{{- end -}}
+{{- end -}}
