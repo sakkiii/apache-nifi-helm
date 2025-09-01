@@ -15,6 +15,7 @@ jobs:
   publish:
     name: 📦 Publish Chart
     runs-on: ubuntu-22.04
+    environment: github-pages
     
     permissions:
       contents: write  # Need write access for tags and releases
