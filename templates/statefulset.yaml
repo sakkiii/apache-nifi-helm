@@ -1,4 +1,8 @@
 {{- $nifiHome := "/opt/nifi/nifi-current" }}
+{{- /* Validate that basic auth is only used with single node */ -}}
+{{- if and (not .Values.global.oidc.enabled) (not .Values.global.ldap.enabled) (gt (.Values.global.nifi.nodeCount | int) 1) }}
+{{- fail "Basic authentication (Single User Authentication) only supports single-node deployment. Please set global.nifi.nodeCount to 1, or enable OIDC/LDAP authentication for clustering." }}
+{{- end }}
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
@@ -97,7 +101,8 @@ spec:
             - name: NIFI_SENSITIVE_PROPS_KEY
               valueFrom:
                 secretKeyRef:
-                  {{- toYaml .Values.global.encryption.sensitivePropertiesKey.secretRef | nindent 18 }}
+                  name: {{ default "encryption-sensitive-key" .Values.global.encryption.sensitivePropertiesKey.secretRef.name | quote }}
+                  key: {{ default "sensitivekey" .Values.global.encryption.sensitivePropertiesKey.secretRef.key | quote }}
             - name: NIFI_JVM_HEAP_INIT
               value: {{ .Values.jvmHeap.min | quote }}
             - name: NIFI_JVM_HEAP_MAX
@@ -121,7 +126,17 @@ spec:
               value: {{ .Values.ports.cluster | quote }}
             {{- end }}
             {{- include "nifi.keystoreEnvironment" . | nindent 12 }}
+            {{- /* Authentication environment variables with priority: OIDC > LDAP > Basic Auth */}}
+            {{- if .Values.global.oidc.enabled }}
+            {{- /* OIDC has highest priority */}}
             {{- include "nifi.oidcEnvironment" . | nindent 12 }}
+            {{- else if .Values.global.ldap.enabled }}
+            {{- /* LDAP is second priority (only if OIDC is disabled) */}}
+            {{- include "nifi.ldapEnvironment" . | nindent 12 }}
+            {{- else }}
+            {{- /* Basic auth is the default fallback (when both OIDC and LDAP are disabled) */}}
+            {{- include "nifi.basicAuthEnvironment" . | nindent 12 }}
+            {{- end }}
             {{- with .Values.extraEnv }}
             {{ toYaml . | nindent 12 }}
             {{- end }}
@@ -290,6 +305,10 @@ spec:
         {{- end }}
       {{- with .Values.tolerations }}
       tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.topologySpreadConstraints }}
+      topologySpreadConstraints:
         {{- toYaml . | nindent 8 }}
       {{- end }}
   {{- with .Values.volumeClaims }}

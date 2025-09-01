@@ -1,3 +1,4 @@
+{{- if .Values.ingress.enabled }}
 {{- $serviceName := (printf "%s-http" (include "nifi.fullname" . )) }}
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -37,3 +38,4 @@ spec:
                 name: {{ $serviceName }}
                 port:
                   name: https
+{{- end }}
