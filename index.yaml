@@ -1,19 +1,50 @@
 apiVersion: v1
 entries:
   nifi:
-  - apiVersion: v2
+  - annotations:
+      category: Analytics
+      images: |
+        - name: nifi
+          image: apache/nifi:1.28.1
+        - name: zookeeper
+          image: bitnami/zookeeper:3.9.2-debian-12-r7
+      licenses: Apache-2.0
+    apiVersion: v2
     appVersion: 1.28.1
-    created: "2025-09-01T04:29:01.608455815Z"
+    created: "2025-09-01T05:38:17.106257974Z"
     dependencies:
     - condition: zookeeper.enabled
       name: zookeeper
       repository: https://charts.bitnami.com/bitnami
       version: 13.4.14
-    description: A Helm chart for Apache NiFi
-    digest: 61486cdf6ec14dc8ac66c804c2f11b350c5e1a2ebebc0b480f12c26e39068f54
+    description: Production-ready Apache NiFi Helm chart with enterprise authentication,
+      high availability, and advanced security features
+    digest: 14fea6913fa569877096c657608924915bd77c392841e8df59723b2f5fd34fcf
+    home: https://github.com/sakkiii/apache-nifi-helm
+    keywords:
+    - nifi
+    - apache
+    - dataflow
+    - etl
+    - streaming
+    - data-processing
+    - enterprise
+    - authentication
+    - clustering
+    maintainers:
+    - email: saket@example.com
+      name: sakkiii
+      url: https://github.com/sakkiii
     name: nifi
+    sources:
+    - https://github.com/sakkiii/apache-nifi-helm
+    - https://github.com/apache/nifi
     type: application
     urls:
-    - https://sakkiii.github.io/apache-nifi-helm/nifi-0.5.0.tgz
-    version: 0.5.0
-generated: "2025-09-01T04:29:01.6033847Z"
+    - https://sakkiii.github.io/apache-nifi-helm/nifi-0.6.0.tgz
+    version: 0.6.0
+generated: "2025-09-01T05:38:17.101207726Z"
+# Generated on: 2025-09-01T05:38:17Z
+# Chart Version: 0.6.0
+# App Version: 1.28.1
+# Commit: 8852000be81da6d2908fe8a8fa48ca76518c5831
