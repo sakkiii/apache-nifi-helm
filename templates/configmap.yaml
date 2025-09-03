@@ -58,8 +58,13 @@ data:
     prop_add 'nifi.remote.route.http.ingress.secure' 'true'
 
     {{- /* Replace properties not exposed by environment variables */}}
-    {{- if .Values.zookeeper.enabled }}
+    {{- if eq (include "nifi.useZooKeeper" .) "true" }}
     prop_replace 'nifi.zookeeper.client.secure' 'false'
+    {{- else }}
+    prop_replace 'nifi.state.management.provider.cluster' 'kubernetes-provider'
+    xmlstarlet ed --inplace --update "/stateManagement/cluster-provider[id='kubernetes-provider']/property[@name='ConfigMap Name Prefix']" --value '{{ .Values.stateManagement.kubernetes.statePrefix }}' "conf/state-management.xml"
+    xmlstarlet ed --inplace --update "/stateManagement/cluster-provider[id='kubernetes-provider']/property[@name='ConfigMap Namespace']" --value '{{ include "nifi.stateManagementNamespace" . }}' "conf/state-management.xml"
+    {{- end }}
 
     {{- /* Grant nodes cluster permissions */}}
     list_identities () {
@@ -106,6 +111,7 @@ data:
     prop_add 'nifi.nar.library.directory.custom' {{ .Values.customLibPath | squote }}
 
     {{- /* Generate a TLS cert for this node from the CSI-provided certificates and private key */}}
+    {{- if .Values.global.tls.certificate }}
     cert_dir='/opt/certmanager'
     tls_dir='/opt/tls'
     rm -f $tls_dir/*

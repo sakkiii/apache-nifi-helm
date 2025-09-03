@@ -89,6 +89,13 @@ ui:
   timeZone: "Asia/Calcutta" # IANA timezone identifier. Time is displayed using this timezone in the UI.
   maxThreads: "" # Maximum number of Jetty threads to use for UI and HTTP site-to-site connections
 
+# Cluster Communication Configuration
+cluster:
+  # Maximum number of threads for inter-node communication
+  # Used for both ZooKeeper and Kubernetes state management strategies
+  nodeProtocol:
+    maxThreads: 100
+
 tls:
   # Additional subject alternative names included in the certificate issued to cluster nodes
   subjectAltNames: [ ]
@@ -159,19 +166,52 @@ service:
     type: LoadBalancer # NodePort | LoadBalancer
     externalTrafficPolicy: Cluster # Cluster | Local
 
+## ==========================================
+## STATE MANAGEMENT CONFIGURATION
+## ==========================================
+## NiFi supports two state management approaches:
+## 1. ZooKeeper (NiFi < 2.0 and backward compatibility)
+## 2. Kubernetes Native (NiFi 2.0+, recommended)
+
+## State Management Strategy (auto-detected based on NiFi version)
+## - For NiFi 2.0+: Kubernetes state management is used by default
+## - For NiFi < 2.0: ZooKeeper is used by default
+## - Manual override available via stateManagement.strategy
+stateManagement:
+  # Strategy: "auto" | "zookeeper" | "kubernetes"
+  # - auto: Automatically choose based on NiFi version (recommended)
+  # - zookeeper: Force ZooKeeper for all versions
+  # - kubernetes: Force Kubernetes for all versions (requires NiFi 2.0+)
+  strategy: "auto"
+  
+  # Kubernetes State Management (NiFi 2.0+)
+  kubernetes:
+    # Prefix for Kubernetes lease resources (for leader election)
+    leasePrefix: "nifi-lease"
+    # Prefix for Kubernetes ConfigMap resources (for cluster state)
+    statePrefix: "nifi-state"
+    # Note: Always uses release namespace for security and simplicity
+
+## ZooKeeper Configuration (for backward compatibility and NiFi < 2.0)
 zookeeper:
-  ## If true, install the Zookeeper chart
-  ## ref: https://github.com/bitnami/charts/blob/master/bitnami/zookeeper/values.yaml
+  ## Enable ZooKeeper deployment
+  ## Automatically disabled when Kubernetes state management is used
   enabled: true
-  ## If the Zookeeper Chart is disabled a URL and port are required to connect
-  url: ""
-  port: 2181
-  rootNode: "/data"
+  
+  ## External ZooKeeper Configuration
+  ## If enabled=false, provide external ZooKeeper connection details
+  external:
+    # External ZooKeeper connection string (comma-separated)
+    url: ""  # e.g., "zk1.example.com:2181,zk2.example.com:2181"
+    port: 2181
+    rootNode: "/nifi"
+  
+  ## Embedded ZooKeeper Configuration (when enabled=true)
+  ## ref: https://github.com/bitnami/charts/blob/master/bitnami/zookeeper/values.yaml
   replicaCount: 3
+  rootNode: "/nifi"
   metrics:
     enabled: true
-  traffic:
-    maxThreads: 100 # Max number of threads used for inter-node communication
   ## Set container resources according to one common 
   ## preset allowed values: none, nano, micro, small, medium, large, xlarge, 2xlarge. 
   ## This is ignored if resources is set

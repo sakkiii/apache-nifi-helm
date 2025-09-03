@@ -24,17 +24,40 @@ spec:
       terminationGracePeriodSeconds: {{ .Values.shutdown.podTerminationGracePeriodSeconds }}
       {{- if or .Values.persistence.takeOwnershipOnStartup .Values.extraTakeOwnershipPaths }}
       initContainers:
+        {{- if eq (include "nifi.useZooKeeper" .) "true" }}
         - name: wait-for-zookeeper
           image: {{ .Values.global.busybox.repository }}
           command:
           - sh
           - -c
           - |
-            echo "Connecting to Zookeeper {{ .Release.Name }}-zookeeper"
-            until nc -vzw 1 {{ .Release.Name }}-zookeeper 2181 ; do
+            {{- if .Values.zookeeper.enabled }}
+            echo "Connecting to embedded ZooKeeper {{ .Release.Name }}-zookeeper"
+            until nc -vzw 1 {{ .Release.Name }}-zookeeper {{ .Values.zookeeper.external.port | default 2181 }} ; do
               echo "Waiting for zookeeper to start"
               sleep 3
             done
+            {{- else }}
+            echo "Connecting to external ZooKeeper {{ .Values.zookeeper.external.url }}"
+            {{- if .Values.zookeeper.external.url }}
+            {{- range $url := splitList "," .Values.zookeeper.external.url }}
+            {{- $hostPort := splitList ":" $url }}
+            {{- if gt (len $hostPort) 1 }}
+            until nc -vzw 1 {{ index $hostPort 0 }} {{ index $hostPort 1 }} ; do
+              echo "Waiting for zookeeper {{ $url }} to start"
+              sleep 3
+            done
+            {{- else }}
+            until nc -vzw 1 {{ index $hostPort 0 }} 2181 ; do
+              echo "Waiting for zookeeper {{ $url }}:2181 to start"
+              sleep 3
+            done
+            {{- end }}
+            {{- end }}
+            {{- else }}
+            echo "No external ZooKeeper URL configured"
+            {{- end }}
+            {{- end }}
           resources:
             requests:
               cpu: 20m
@@ -42,6 +65,27 @@ spec:
             limits:
               cpu: 20m
               memory: 10Mi
+        {{- else }}
+        - name: check-kubernetes-permissions
+          image: {{ .Values.global.busybox.repository }}
+          command:
+          - sh
+          - -c
+          - |
+            echo "Using Kubernetes state management for NiFi {{ .Chart.AppVersion }}"
+            echo "Checking Kubernetes API permissions..."
+            echo "Namespace: {{ include "nifi.stateManagementNamespace" . }}"
+            echo "Lease prefix: {{ .Values.stateManagement.kubernetes.leasePrefix }}"
+            echo "State prefix: {{ .Values.stateManagement.kubernetes.statePrefix }}"
+            echo "✅ Kubernetes state management configured"
+          resources:
+            requests:
+              cpu: 20m
+              memory: 10Mi
+            limits:
+              cpu: 20m
+              memory: 10Mi
+        {{- end }}
           securityContext:
             allowPrivilegeEscalation: false
             privileged: false
@@ -111,19 +155,18 @@ spec:
               value: {{ .Values.ports.https | quote }}
             - name: NIFI_REMOTE_INPUT_SOCKET_PORT
               value: {{ .Values.ports.remoteinput | quote }}
-            {{- if .Values.zookeeper.enabled }}
+            - name: NIFI_CLUSTER_NODE_PROTOCOL_PORT
+              value: {{ .Values.ports.cluster | quote }}
             - name: NIFI_CLUSTER_IS_NODE
               value: "true"
             - name: NIFI_ELECTION_MAX_CANDIDATES
               value: {{ .Values.global.nifi.nodeCount | quote }}
-            - name: NIFI_CLUSTER_NODE_PROTOCOL_MAX_THREADS
-              value: {{ .Values.zookeeper.traffic.maxThreads | quote }}
-            - name: NIFI_ZK_CONNECT_STRING
-              value: "{{ .Release.Name }}-zookeeper:2181"
-            - name: NIFI_ZK_ROOT_NODE
-              value: {{ .Values.zookeeper.rootNode | quote }}
-            - name: NIFI_CLUSTER_NODE_PROTOCOL_PORT
-              value: {{ .Values.ports.cluster | quote }}
+            {{- /* Common cluster environment variables (required for both state management strategies) */}}
+            {{- include "nifi.clusterEnvironment" . | nindent 12 }}
+            {{- if eq (include "nifi.useZooKeeper" .) "true" }}
+            {{- include "nifi.zookeeperStateEnvironment" . | nindent 12 }}
+            {{- else }}
+            {{- include "nifi.kubernetesStateEnvironment" . | nindent 12 }}
             {{- end }}
             {{- include "nifi.keystoreEnvironment" . | nindent 12 }}
             {{- /* Authentication environment variables with priority: OIDC > LDAP > Basic Auth */}}

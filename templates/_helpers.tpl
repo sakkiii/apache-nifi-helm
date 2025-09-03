@@ -228,3 +228,116 @@ Automatically disabled if OIDC or LDAP is enabled
 {{- end -}}
 {{- end -}}
 {{- end -}}
+
+{{/*
+Determine if NiFi version is 2.0 or higher
+*/}}
+{{- define "nifi.isVersion2Plus" -}}
+{{- $appVersion := .Chart.AppVersion | toString -}}
+{{- $version := $appVersion | replace "v" "" | replace "-SNAPSHOT" "" -}}
+{{- $majorVersion := $version | splitList "." | first | int -}}
+{{- if ge $majorVersion 2 -}}
+true
+{{- else -}}
+false
+{{- end -}}
+{{- end }}
+
+{{/*
+Determine the state management strategy to use
+Returns: "kubernetes" or "zookeeper"
+*/}}
+{{- define "nifi.stateManagementStrategy" -}}
+{{- $strategy := .Values.stateManagement.strategy | default "auto" -}}
+{{- if eq $strategy "auto" -}}
+  {{- if eq (include "nifi.isVersion2Plus" .) "true" -}}
+kubernetes
+  {{- else -}}
+zookeeper
+  {{- end -}}
+{{- else -}}
+{{ $strategy }}
+{{- end -}}
+{{- end }}
+
+{{/*
+Check if ZooKeeper should be enabled
+*/}}
+{{- define "nifi.useZooKeeper" -}}
+{{- if eq (include "nifi.stateManagementStrategy" .) "zookeeper" -}}
+true
+{{- else -}}
+false
+{{- end -}}
+{{- end }}
+
+{{/*
+Check if Kubernetes state management should be used
+*/}}
+{{- define "nifi.useKubernetesStateManagement" -}}
+{{- if eq (include "nifi.stateManagementStrategy" .) "kubernetes" -}}
+true
+{{- else -}}
+false
+{{- end -}}
+{{- end }}
+
+{{/*
+Get the namespace for Kubernetes state management resources
+Always uses the release namespace for security and simplicity
+*/}}
+{{- define "nifi.stateManagementNamespace" -}}
+{{ .Release.Namespace }}
+{{- end }}
+
+{{/*
+Common cluster environment variables (used by both state management strategies)
+*/}}
+{{- define "nifi.clusterEnvironment" -}}
+- name: NIFI_CLUSTER_NODE_PROTOCOL_MAX_THREADS
+  value: {{ .Values.cluster.nodeProtocol.maxThreads | quote }}
+{{- end }}
+
+{{/*
+Kubernetes state management environment variables
+*/}}
+{{- define "nifi.kubernetesStateEnvironment" -}}
+- name: NIFI_CLUSTER_LEADER_ELECTION_IMPLEMENTATION
+  value: KubernetesLeaderElectionManager
+- name: NIFI_CLUSTER_LEADER_ELECTION_KUBERNETES_LEASE_PREFIX
+  value: {{ .Values.stateManagement.kubernetes.leasePrefix | quote }}
+- name: NIFI_CLUSTER_LEADER_ELECTION_KUBERNETES_LEASE_NAMESPACE
+  value: {{ include "nifi.stateManagementNamespace" . | quote }}
+- name: NIFI_STATE_MANAGEMENT_PROVIDER_CLUSTER
+  value: kubernetes-provider
+- name: NIFI_STATE_MANAGEMENT_KUBERNETES_CONFIG_MAP_NAME_PREFIX
+  value: {{ .Values.stateManagement.kubernetes.statePrefix | quote }}
+- name: NIFI_STATE_MANAGEMENT_KUBERNETES_CONFIG_MAP_NAMESPACE
+  value: {{ include "nifi.stateManagementNamespace" . | quote }}
+{{- end }}
+
+{{/*
+ZooKeeper state management environment variables
+*/}}
+{{- define "nifi.zookeeperStateEnvironment" -}}
+{{- if .Values.zookeeper.enabled }}
+- name: NIFI_ZK_CONNECT_STRING
+  value: "{{ .Release.Name }}-zookeeper:{{ .Values.zookeeper.external.port | default 2181 }}"
+{{- else }}
+- name: NIFI_ZK_CONNECT_STRING
+  value: "{{ .Values.zookeeper.external.url }}"
+{{- end }}
+- name: NIFI_ZK_ROOT_NODE
+  value: {{ .Values.zookeeper.rootNode | default "/nifi" | quote }}
+{{- end }}
+
+{{/*
+Create the name of the service account to use
+*/}}
+{{- define "nifi.serviceAccountName" -}}
+{{- if .Values.global.serviceAccount.name }}
+{{- .Values.global.serviceAccount.name }}
+{{- else }}
+{{- include "nifi.fullname" . }}
+{{- end }}
+{{- end }}
