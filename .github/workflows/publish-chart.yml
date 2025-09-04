@@ -38,7 +38,7 @@ env:
   CHART_PATH: .
   REPO_URL: https://sakkiii.github.io/apache-nifi-helm
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
+  CHART_NAME: apache-nifi-helm
 
 jobs:
   # ==========================================
@@ -169,6 +169,7 @@ jobs:
     permissions:
       contents: write
       pages: write
+      packages: write
       id-token: write
     
     steps:
@@ -210,6 +211,29 @@ jobs:
             helm package --sign --key "Helm Chart Signing" --keyring ~/.gnupg/secring.gpg "$chart"
           done
 
+      - name: 🐳 Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 📦 Push to GitHub Packages (OCI)
+        run: |
+          VERSION="${{ needs.validate.outputs.chart-version }}"
+          CHART_FILE=$(find packaged-charts/ -name "*.tgz" | head -1)
+          
+          echo "📦 Pushing chart to GitHub Packages as OCI artifact..."
+          echo "🔗 Registry: ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.CHART_NAME }}"
+          echo "🏷️ Version: $VERSION"
+          
+          # Push chart as OCI artifact
+          helm push "$CHART_FILE" oci://${{ env.REGISTRY }}/${{ github.repository_owner }}
+          
+          echo "✅ Successfully pushed to GitHub Packages!"
+          echo "📋 Install command:"
+          echo "helm install my-nifi oci://${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.CHART_NAME }} --version $VERSION"
+
       - name: 📋 Generate Helm Index
         run: |
           helm repo index packaged-charts/ --url "${{ env.REPO_URL }}"
@@ -220,6 +244,7 @@ jobs:
           # Chart Version: ${{ needs.validate.outputs.chart-version }}
           # App Version: ${{ needs.validate.outputs.app-version }}
           # Commit: ${{ github.sha }}
+          # OCI Registry: ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.CHART_NAME }}
           EOF
 
       - name: 🏷️ Create Git Tag
@@ -245,11 +270,18 @@ jobs:
           - **App Version**: $APP_VERSION (Apache NiFi)
           - **Release Date**: $(date -u +"%Y-%m-%d")
           
-          ## 🚀 Installation
+          ## 🚀 Installation Options
+          
+          ### Option 1: GitHub Pages (Traditional Helm Repository)
           \`\`\`bash
           helm repo add apache-nifi-helm https://sakkiii.github.io/apache-nifi-helm
           helm repo update
           helm install my-nifi apache-nifi-helm/nifi --version $VERSION
+          \`\`\`
+          
+          ### Option 2: GitHub Packages (OCI Registry)
+          \`\`\`bash
+          helm install my-nifi oci://ghcr.io/sakkiii/apache-nifi-helm --version $VERSION
           \`\`\`
           
           ## 🔐 Authentication Methods Supported
@@ -270,8 +302,15 @@ jobs:
           - [Configuration Examples](https://github.com/sakkiii/apache-nifi-helm/tree/main/examples)
           
           ## 🔄 Upgrade Instructions
+          
+          ### From GitHub Pages Repository:
           \`\`\`bash
           helm upgrade my-nifi apache-nifi-helm/nifi --version $VERSION
+          \`\`\`
+          
+          ### From GitHub Packages (OCI):
+          \`\`\`bash
+          helm upgrade my-nifi oci://ghcr.io/sakkiii/apache-nifi-helm --version $VERSION
           \`\`\`
           
           ---
@@ -314,5 +353,12 @@ jobs:
         run: |
           echo "🎉 Successfully published Apache NiFi Helm Chart!"
           echo "📦 Version: ${{ needs.validate.outputs.chart-version }}"
-          echo "🔗 Repository: https://sakkiii.github.io/apache-nifi-helm"
+          echo ""
+          echo "📍 Available from multiple sources:"
+          echo "🔗 GitHub Pages: https://sakkiii.github.io/apache-nifi-helm"
+          echo "📦 GitHub Packages: ghcr.io/${{ github.repository_owner }}/${{ env.CHART_NAME }}"
           echo "📋 Release: https://github.com/sakkiii/apache-nifi-helm/releases/tag/v${{ needs.validate.outputs.chart-version }}"
+          echo ""
+          echo "📋 Installation commands:"
+          echo "helm repo add apache-nifi-helm https://sakkiii.github.io/apache-nifi-helm && helm install my-nifi apache-nifi-helm/nifi"
+          echo "helm install my-nifi oci://ghcr.io/${{ github.repository_owner }}/${{ env.CHART_NAME }}"
