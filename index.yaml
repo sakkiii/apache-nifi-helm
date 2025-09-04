@@ -11,7 +11,7 @@ entries:
       licenses: Apache-2.0
     apiVersion: v2
     appVersion: 1.28.1
-    created: "2025-09-01T07:33:38.10850702Z"
+    created: "2025-09-04T04:05:54.382289905Z"
     dependencies:
     - condition: zookeeper.enabled
       name: zookeeper
@@ -19,7 +19,7 @@ entries:
       version: 13.4.14
     description: Production-ready Apache NiFi Helm chart with enterprise authentication,
       high availability, and advanced security features
-    digest: f821d69794a3688f0e5eaa4dc67cf4c67ac94345e29c75e36a5fe368dd871bfd
+    digest: 53877e94763ffff322c2a5a4dfe27a814597825c7d179c1f2f22816ffafbebd4
     home: https://github.com/sakkiii/apache-nifi-helm
     keywords:
     - nifi
@@ -41,10 +41,11 @@ entries:
     - https://github.com/apache/nifi
     type: application
     urls:
-    - https://sakkiii.github.io/apache-nifi-helm/nifi-0.7.0.tgz
-    version: 0.7.0
-generated: "2025-09-01T07:33:38.103196143Z"
-# Generated on: 2025-09-01T07:33:38Z
-# Chart Version: 0.7.0
+    - https://sakkiii.github.io/apache-nifi-helm/nifi-1.0.0.tgz
+    version: 1.0.0
+generated: "2025-09-04T04:05:54.377144006Z"
+# Generated on: 2025-09-04T04:05:54Z
+# Chart Version: 1.0.0
 # App Version: 1.28.1
-# Commit: 555c5c6559cec5aabdc590489d41e63d23f83f4a
+# Commit: 2b03f716c7a7bb83d235e143bf79325b9aa1abe7
+# OCI Registry: ghcr.io/sakkiii/apache-nifi-helm
