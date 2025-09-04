@@ -53,3 +53,4 @@ dependencies:
     name: zookeeper
     repository: https://charts.bitnami.com/bitnami
     version: 13.4.14
+    # Note: ZooKeeper is automatically disabled when using Kubernetes state management

@@ -11,6 +11,7 @@ A production-ready Helm chart for deploying Apache NiFi on Kubernetes with enter
 
 - 🔐 **Multiple Authentication Methods**: Basic Auth, LDAP, and OIDC with automatic fallback
 - 🏗️ **High Availability**: Multi-node clustering with StatefulSets and Pod Disruption Budgets
+- 🚀 **Smart State Management**: Kubernetes-native state management for NiFi 2.0+ with ZooKeeper fallback
 - 🔒 **Enterprise Security**: TLS/SSL, cert-manager integration, and secure secret management
 - 📊 **Monitoring & Observability**: Prometheus metrics, Grafana dashboards, and custom exporters
 - 💾 **Flexible Storage**: Multiple persistent volume configurations for different repositories
@@ -22,6 +23,7 @@ A production-ready Helm chart for deploying Apache NiFi on Kubernetes with enter
 - [Quick Start](#-quick-start)
 - [Prerequisites](#-prerequisites)
 - [Installation](#-installation)
+- [State Management](#-state-management)
 - [Authentication](#-authentication)
 - [Configuration](#-configuration)
 - [Advanced Configuration](#-advanced-configuration)
@@ -116,6 +118,50 @@ helm upgrade my-nifi apache-nifi-helm/nifi -f my-values.yaml -n nifi
 ```bash
 helm uninstall my-nifi -n nifi
 ```
+
+## 🚀 State Management
+
+This chart supports **both ZooKeeper and Kubernetes-native state management** with automatic version detection and backward compatibility.
+
+### 📋 **Available Strategies**
+
+| Strategy | NiFi Version | Description |
+|----------|--------------|-------------|
+| `auto` | All | **Recommended** - Automatically choose based on NiFi version |
+| `kubernetes` | 2.0+ | Native Kubernetes state management (ConfigMaps + Leases) |
+| `zookeeper` | All | Traditional ZooKeeper-based clustering |
+
+### 🎯 **Quick Configuration**
+
+```yaml
+# values.yaml - Automatic strategy (recommended)
+stateManagement:
+  strategy: "auto"  # Kubernetes for NiFi 2.0+, ZooKeeper for older versions
+```
+
+```yaml
+# values.yaml - Force Kubernetes state management (NiFi 2.0+)
+stateManagement:
+  strategy: "kubernetes"
+  kubernetes:
+    leasePrefix: "nifi-lease"
+    statePrefix: "nifi-state"
+    # Note: Always uses release namespace
+```
+
+```yaml
+# values.yaml - Force ZooKeeper state management
+stateManagement:
+  strategy: "zookeeper"
+zookeeper:
+  enabled: true
+  replicaCount: 3
+```
+
+### 📚 **Detailed Documentation**
+
+For comprehensive state management documentation, examples, and migration guides, see:
+**[📖 Kubernetes State Management Guide](./KUBERNETES_STATE_MANAGEMENT.md)**
 
 ## 🔐 Authentication
 

@@ -1,0 +1,46 @@
+{{- if eq (include "nifi.useKubernetesStateManagement" .) "true" }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "nifi.fullname" . }}-state-management
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "nifi.labels" . | nindent 4 }}
+    component: state-management
+rules:
+  # Permissions for Kubernetes state management (ConfigMaps)
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "list", "create", "update", "patch", "delete"]
+  # Permissions for leader election (Leases)
+  - apiGroups: ["coordination.k8s.io"]
+    resources: ["leases"]
+    verbs: ["get", "list", "create", "update", "patch", "delete"]
+  # Permissions to read pods (for cluster membership)
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch"]
+  # Permissions for events (optional, for better observability)
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["create", "patch"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "nifi.fullname" . }}-state-management
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "nifi.labels" . | nindent 4 }}
+    component: state-management
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "nifi.serviceAccountName" . }}
+    namespace: {{ .Release.Namespace }}
+roleRef:
+  kind: Role
+  name: {{ include "nifi.fullname" . }}-state-management
+  apiGroup: rbac.authorization.k8s.io
+{{- end }}
